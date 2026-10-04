@@ -4,7 +4,7 @@ One read-only command that explains why a remote MCP server's OAuth login fails.
 
 Checked against the MCP authorization specification, both the 2026-07-28 release and 2025-11-25. Python 3.11+, one dependency (httpx), runs with `pipx` or `uvx`.
 
-Part of [Hisar](https://github.com/basitalisandhu/hisar) ([docs](https://basitalisandhu.github.io/hisar/)), open-source trust infrastructure for AI agents: who they are, what they may touch, and proof of what they did.
+Part of [Masoon](https://github.com/basitalisandhu/masoon) ([docs](https://basitalisandhu.github.io/masoon/)), open-source trust infrastructure for AI agents: who they are, what they may touch, and proof of what they did.
 
 [![CI](https://github.com/basitalisandhu/mcp-auth-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/basitalisandhu/mcp-auth-doctor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -274,8 +274,8 @@ Issues and pull requests are welcome. Adding a check is a few lines in `checks.p
 
 ## Sibling projects
 
-- [hisar](https://github.com/basitalisandhu/hisar): the platform front door, with the [docs site](https://basitalisandhu.github.io/hisar/).
-- [hisar-broker](https://basitalisandhu.github.io/hisar/hisar-broker.html): scoped, short-lived credentials for AI agents with approvals, kill switch and tamper-evident audit.
+- [masoon](https://github.com/basitalisandhu/masoon): the platform front door, with the [docs site](https://basitalisandhu.github.io/masoon/).
+- [Masoon Broker](https://basitalisandhu.github.io/masoon/masoon-broker.html): scoped, short-lived credentials for AI agents with approvals, kill switch and tamper-evident audit.
 - [agent-threat-model](https://github.com/basitalisandhu/agent-threat-model): deterministic STRIDE and OWASP Agentic threat modelling for agent systems described in YAML.
 - [agentic-semgrep-rules](https://github.com/basitalisandhu/agentic-semgrep-rules): Semgrep rule pack for insecure agent code, including MCP servers without auth.
 - [agent-security-skills](https://github.com/basitalisandhu/agent-security-skills): Claude Code plugin and skill pack for agent security reviews.
