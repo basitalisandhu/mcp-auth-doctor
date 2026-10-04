@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.1] - 2026-10-06
+
 ### Changed
 
 - Removed the umbrella branding; this project stands alone and links its sibling repositories directly.
@@ -25,5 +29,6 @@ All notable changes to this project are documented here. The format follows
 
 - Renamed the umbrella project from Hisar to Masoon; links, names and identifiers updated.
 
-[Unreleased]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/basitalisandhu/mcp-auth-doctor/releases/tag/v0.1.0
