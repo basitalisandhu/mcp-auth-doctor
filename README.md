@@ -44,6 +44,33 @@ pip install git+https://github.com/basitalisandhu/mcp-auth-doctor               
 
 Once the package is on PyPI the short forms work too: `pipx install mcp-auth-doctor`, `uvx mcp-auth-doctor https://host/mcp`, `pip install mcp-auth-doctor`.
 
+### Container image
+
+Each release tag publishes `ghcr.io/basitalisandhu/mcp-auth-doctor` for linux/amd64 and linux/arm64, tagged with the version and `latest`. The image runs as uid 1000 with `/work` as the working directory:
+
+```bash
+docker run --rm -v "$PWD:/work" ghcr.io/basitalisandhu/mcp-auth-doctor:0.1.0 https://host/mcp --json
+```
+
+Inside a container, `127.0.0.1` is the container itself. To check a server on your machine, use the server's network address, or on Linux add `--network host`. The `--login` flow needs a browser and a loopback callback, so run it from a local install instead.
+
+The image is signed with a keyless cosign signature and has a build provenance attestation and an SPDX SBOM (attached to the GitHub Release). To verify:
+
+```bash
+cosign verify ghcr.io/basitalisandhu/mcp-auth-doctor:0.1.0 \
+  --certificate-identity-regexp '^https://github.com/basitalisandhu/mcp-auth-doctor/\.github/workflows/publish-github-packages\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify oci://ghcr.io/basitalisandhu/mcp-auth-doctor:0.1.0 --repo basitalisandhu/mcp-auth-doctor
+```
+
+### pip
+
+Once published to PyPI:
+
+```bash
+pip install mcp-auth-doctor
+```
+
 ## Usage
 
 ```text

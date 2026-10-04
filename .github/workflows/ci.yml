@@ -41,3 +41,24 @@ jobs:
           mcp-auth-doctor http://127.0.0.1:8765/mcp --dcr-probe
           if mcp-auth-doctor http://127.0.0.1:8766/mcp --json > broken.json; then echo "expected exit 1"; exit 1; fi
           python -c "import json; d=json.load(open('broken.json')); assert d['summary']['exit_code']==1; assert any(c['id']=='prm-resource' and c['status']=='fail' for c in d['checks'])"
+
+  container-build:
+    name: Build the container image and run it
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image, print --help and check the demo server from a second container
+        run: |
+          docker build --build-arg VERSION=ci -t mcp-auth-doctor:ci .
+          docker run --rm mcp-auth-doctor:ci --help > help.txt && grep "^usage: mcp-auth-doctor" help.txt
+          docker run --rm mcp-auth-doctor:ci --version
+          test "$(docker run --rm --entrypoint id mcp-auth-doctor:ci -u)" = "1000"
+          docker run -d --name demo -v "$PWD/scripts:/scripts:ro" --entrypoint python mcp-auth-doctor:ci /scripts/demo_server.py --port 8765
+          docker run -d --name broken -v "$PWD/scripts:/scripts:ro" --entrypoint python mcp-auth-doctor:ci /scripts/demo_server.py --port 8766 --broken
+          sleep 2
+          docker run --rm --network container:demo mcp-auth-doctor:ci http://127.0.0.1:8765/mcp --dcr-probe
+          set +e
+          docker run --rm --network container:broken mcp-auth-doctor:ci http://127.0.0.1:8766/mcp --json > /dev/null
+          test $? -eq 1
