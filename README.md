@@ -131,6 +131,9 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8765/mcp
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
+  as-https                   WARN  authorization server endpoints MUST use HTTPS (MCP authorization, Security Considerations); HTTP loopback is warned for local development
+                                   issuer: http://127.0.0.1:8765
+                                   endpoints: {"authorization_endpoint":"http://127.0.0.1:8765/authorize","token_endpoint":"http://127.0.0.1:8765/token","registration_endpoint":"http://127.0.0.1:8765/register"}
   as-pkce                    PASS  PKCE S256 advertised
   as-registration            PASS  Client ID Metadata Documents and Dynamic Client Registration both available
   as-iss                     PASS  `iss` in authorization responses advertised (RFC 9207)
@@ -139,7 +142,7 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8765/mcp
   login-token                skip  pass --login to run the PKCE code flow
   login-tools-list           skip  pass --login to run the PKCE code flow
 
-12 pass, 0 fail, 0 warn, 3 skip. Verdict: PASS (exit 0)
+12 pass, 0 fail, 1 warn, 3 skip. Verdict: PASS (exit 0)
 ```
 
 The same script started with `--broken` reproduces three faults seen in the field, a trailing-slash mismatch, no PKCE advertised and a form-encoded token error:
@@ -159,6 +162,9 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8766/mcp
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
+  as-https                   WARN  authorization server endpoints MUST use HTTPS (MCP authorization, Security Considerations); HTTP loopback is warned for local development
+                                   issuer: http://127.0.0.1:8766
+                                   endpoints: {"authorization_endpoint":"http://127.0.0.1:8766/authorize","token_endpoint":"http://127.0.0.1:8766/token","registration_endpoint":"http://127.0.0.1:8766/register"}
   as-pkce                    FAIL  `code_challenge_methods_supported` is absent; MCP clients MUST refuse to proceed (advertise ["S256"])
                                    issuer: http://127.0.0.1:8766
   as-registration            PASS  Client ID Metadata Documents and Dynamic Client Registration both available
@@ -173,7 +179,7 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8766/mcp
   login-token                skip  pass --login to run the PKCE code flow
   login-tools-list           skip  pass --login to run the PKCE code flow
 
-9 pass, 3 fail, 0 warn, 3 skip. Verdict: FAIL (exit 1)
+9 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)
 ```
 
 `--json` prints the whole document; three checks from the broken run with `--dcr-probe`:
