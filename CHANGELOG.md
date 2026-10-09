@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-09
+
 ### Added
 
 - `as-https` checks present authorization-server metadata endpoints for HTTPS, failing public HTTP and warning for loopback HTTP used in local development.
@@ -31,6 +33,7 @@ All notable changes to this project are documented here. The format follows
 
 - Renamed the umbrella project from Hisar to Masoon; links, names and identifiers updated.
 
-[Unreleased]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/basitalisandhu/mcp-auth-doctor/releases/tag/v0.1.0

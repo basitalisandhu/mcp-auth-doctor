@@ -47,7 +47,7 @@ Once the package is on PyPI the short forms work too: `pipx install mcp-auth-doc
 Each release tag publishes `ghcr.io/basitalisandhu/mcp-auth-doctor` for linux/amd64 and linux/arm64, tagged with the version and `latest`. The image runs as uid 1000 with `/work` as the working directory:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/basitalisandhu/mcp-auth-doctor:0.1.1 https://host/mcp --json
+docker run --rm -v "$PWD:/work" ghcr.io/basitalisandhu/mcp-auth-doctor:0.2.0 https://host/mcp --json
 ```
 
 Inside a container, `127.0.0.1` is the container itself. To check a server on your machine, use the server's network address, or on Linux add `--network host`. The `--login` flow needs a browser and a loopback callback, so run it from a local install instead.
@@ -55,10 +55,10 @@ Inside a container, `127.0.0.1` is the container itself. To check a server on yo
 The image is signed with a keyless cosign signature and has a build provenance attestation and an SPDX SBOM (attached to the GitHub Release). To verify:
 
 ```bash
-cosign verify ghcr.io/basitalisandhu/mcp-auth-doctor:0.1.1 \
+cosign verify ghcr.io/basitalisandhu/mcp-auth-doctor:0.2.0 \
   --certificate-identity-regexp '^https://github.com/basitalisandhu/mcp-auth-doctor/\.github/workflows/publish-github-packages\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-gh attestation verify oci://ghcr.io/basitalisandhu/mcp-auth-doctor:0.1.1 --repo basitalisandhu/mcp-auth-doctor
+gh attestation verify oci://ghcr.io/basitalisandhu/mcp-auth-doctor:0.2.0 --repo basitalisandhu/mcp-auth-doctor
 ```
 
 ### pip
@@ -121,7 +121,7 @@ Against [`scripts/demo_server.py`](scripts/demo_server.py), a standard-library M
 
 ```text
 $ mcp-auth-doctor http://127.0.0.1:8765/mcp
-mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8765/mcp
+mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
 
   unauth-401                 PASS  POST initialize without Authorization returned 401
   www-authenticate           PASS  Bearer challenge carries resource_metadata
@@ -149,7 +149,7 @@ The same script started with `--broken` reproduces three faults seen in the fiel
 
 ```text
 $ mcp-auth-doctor http://127.0.0.1:8766/mcp
-mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8766/mcp
+mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8766/mcp
 
   unauth-401                 PASS  POST initialize without Authorization returned 401
   www-authenticate           PASS  Bearer challenge carries resource_metadata
@@ -233,7 +233,7 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8766/mcp
     "warn": 0,
     "skip": 2,
     "spec": "2026-07-28",
-    "tool": "mcp-auth-doctor 0.1.1"
+    "tool": "mcp-auth-doctor 0.2.0"
   }
 }
 ```
@@ -244,7 +244,7 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8766/mcp
 $ mcp-auth-doctor http://127.0.0.1:8765/mcp --login --no-browser
 Open this URL to authorize:
   http://127.0.0.1:8765/authorize?response_type=code&client_id=demo-client&redirect_uri=http%3A%2F%2F127.0.0.1%3A42523%2Fcallback&code_challenge=...&code_challenge_method=S256&state=...&resource=http%3A%2F%2F127.0.0.1%3A8765%2Fmcp&scope=mcp%3Aread
-mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8765/mcp
+mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
 
   unauth-401                 PASS  POST initialize without Authorization returned 401
   www-authenticate           PASS  Bearer challenge carries resource_metadata

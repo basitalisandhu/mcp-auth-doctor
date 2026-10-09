@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-auth-doctor"
-version = "0.1.1"
+version = "0.2.0"
 description = "Diagnose OAuth discovery problems on remote MCP servers: 401 challenge, protected resource metadata, authorization server metadata, PKCE, registration, token endpoint, optional login."
 readme = "README.md"
 requires-python = ">=3.11"
