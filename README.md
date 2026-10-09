@@ -106,6 +106,7 @@ In execution order. The `as-*`, `dcr-probe` and `token-error-json` checks repeat
 | `as-metadata` | Metadata is found at `/.well-known/oauth-authorization-server[/path]`, then `/.well-known/openid-configuration[/path]`, then `/path/.well-known/openid-configuration`. | No document at any location clients try. | Serve RFC 8414 metadata at the root well-known path (path inserted after `.well-known/...` for issuers with a path), or OpenID Connect Discovery. |
 | `as-issuer` | The document's `issuer` is identical to the URL used for discovery. | Clients MUST NOT use the metadata (RFC 8414 section 3.3). | Make `issuer` exactly the value listed in `authorization_servers`. |
 | `as-endpoints` | `authorization_endpoint` and `token_endpoint` are absolute URLs. | Nothing to redirect to or redeem at. | Add both as absolute `https://` URLs. |
+| `as-https` | Present authorization, token, registration and JWKS endpoints use HTTPS. | Public non-HTTPS endpoints fail; HTTP on `localhost`, `127.0.0.1` or `::1` warns for development. | Serve endpoints over HTTPS as required by the [MCP authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#security-considerations). The loopback warning is a diagnostic accommodation, not an exception to that requirement. |
 | `as-pkce` | `code_challenge_methods_supported` contains `S256`. | MCP clients MUST refuse to proceed when the member is absent, including with OpenID Connect Discovery. | Add `"code_challenge_methods_supported": ["S256"]` and enforce PKCE at the token endpoint. |
 | `as-registration` | `client_id_metadata_document_supported` is true or `registration_endpoint` is present. | (warn) Clients without a pre-registered client id cannot register. Under 2026-07-28, DCR alone passes with a note that it is deprecated. | Support Client ID Metadata Documents (`client_id_metadata_document_supported: true`), or offer RFC 7591 registration, or document how users obtain a client id. |
 | `as-iss` | `authorization_response_iss_parameter_supported` is true. | (warn under 2026-07-28, skip under 2025-11-25) Clients cannot detect mix-up attacks; the spec says the server SHOULD send `iss`. | Include `iss` in every authorization response and advertise it (RFC 9207). |
@@ -130,6 +131,9 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8765/mcp
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
+  as-https                   WARN  authorization server endpoints MUST use HTTPS (MCP authorization, Security Considerations); HTTP loopback is warned for local development
+                                   issuer: http://127.0.0.1:8765
+                                   endpoints: {"authorization_endpoint":"http://127.0.0.1:8765/authorize","token_endpoint":"http://127.0.0.1:8765/token","registration_endpoint":"http://127.0.0.1:8765/register"}
   as-pkce                    PASS  PKCE S256 advertised
   as-registration            PASS  Client ID Metadata Documents and Dynamic Client Registration both available
   as-iss                     PASS  `iss` in authorization responses advertised (RFC 9207)
@@ -138,7 +142,7 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8765/mcp
   login-token                skip  pass --login to run the PKCE code flow
   login-tools-list           skip  pass --login to run the PKCE code flow
 
-12 pass, 0 fail, 0 warn, 3 skip. Verdict: PASS (exit 0)
+12 pass, 0 fail, 1 warn, 3 skip. Verdict: PASS (exit 0)
 ```
 
 The same script started with `--broken` reproduces three faults seen in the field, a trailing-slash mismatch, no PKCE advertised and a form-encoded token error:
@@ -158,6 +162,9 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8766/mcp
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
+  as-https                   WARN  authorization server endpoints MUST use HTTPS (MCP authorization, Security Considerations); HTTP loopback is warned for local development
+                                   issuer: http://127.0.0.1:8766
+                                   endpoints: {"authorization_endpoint":"http://127.0.0.1:8766/authorize","token_endpoint":"http://127.0.0.1:8766/token","registration_endpoint":"http://127.0.0.1:8766/register"}
   as-pkce                    FAIL  `code_challenge_methods_supported` is absent; MCP clients MUST refuse to proceed (advertise ["S256"])
                                    issuer: http://127.0.0.1:8766
   as-registration            PASS  Client ID Metadata Documents and Dynamic Client Registration both available
@@ -172,7 +179,7 @@ mcp-auth-doctor 0.1.1  spec 2026-07-28  http://127.0.0.1:8766/mcp
   login-token                skip  pass --login to run the PKCE code flow
   login-tools-list           skip  pass --login to run the PKCE code flow
 
-9 pass, 3 fail, 0 warn, 3 skip. Verdict: FAIL (exit 1)
+9 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)
 ```
 
 `--json` prints the whole document; three checks from the broken run with `--dcr-probe`:

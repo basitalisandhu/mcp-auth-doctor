@@ -13,6 +13,7 @@ ALL_IDS = [
     "as-metadata",
     "as-issuer",
     "as-endpoints",
+    "as-https",
     "as-pkce",
     "as-registration",
     "as-iss",
@@ -40,6 +41,49 @@ def test_correct_server_passes_everything(router):
     assert by_id(report, "prm-fetch").evidence["url"] == PRM_PATH
 
 
+@pytest.mark.parametrize(
+    "member",
+    ["authorization_endpoint", "token_endpoint", "registration_endpoint", "jwks_uri"],
+)
+def test_non_https_public_authorization_endpoint_fails(router, member):
+    value = f"http://auth.example.com/{member}"
+    mount(router, metadata={AS: as_metadata(**{member: value})})
+    report = diagnose(MCP)
+    check = by_id(report, "as-https")
+    assert check.status == FAIL
+    assert check.evidence["endpoints"] == {member: value}
+    assert report.exit_code == 1
+
+
+@pytest.mark.parametrize("host", ["localhost", "127.0.0.1", "[::1]"])
+def test_http_loopback_authorization_endpoint_warns(router, host):
+    value = f"http://{host}:8080/token"
+    mount(router, metadata={AS: as_metadata(token_endpoint=value)})
+    check = by_id(diagnose(MCP), "as-https")
+    assert check.status == WARN
+    assert check.evidence["endpoints"] == {"token_endpoint": value}
+
+
+def test_all_https_authorization_endpoints_pass(router):
+    mount(router, metadata={AS: as_metadata(jwks_uri=f"{AS}/jwks")})
+    assert by_id(diagnose(MCP), "as-https").status == PASS
+
+
+def test_public_failure_takes_precedence_over_loopback_warning(router):
+    mount(
+        router,
+        metadata={
+            AS: as_metadata(
+                authorization_endpoint="http://localhost/authorize",
+                token_endpoint="http://public.example/token",
+            )
+        },
+    )
+    check = by_id(diagnose(MCP), "as-https")
+    assert check.status == FAIL
+    assert set(check.evidence["endpoints"]) == {"authorization_endpoint", "token_endpoint"}
+
+
 def test_json_document_shape(router):
     mount(router)
     doc = diagnose(MCP).to_dict()
@@ -47,7 +91,7 @@ def test_json_document_shape(router):
     assert doc["url"] == MCP
     assert all(set(c) == {"id", "status", "reason", "evidence"} for c in doc["checks"])
     assert doc["summary"]["verdict"] == "pass" and doc["summary"]["exit_code"] == 0
-    assert doc["summary"]["pass"] == 12 and doc["summary"]["skip"] == 3
+    assert doc["summary"]["pass"] == 13 and doc["summary"]["skip"] == 3
     assert doc["summary"]["spec"] == "2026-07-28"
 
 

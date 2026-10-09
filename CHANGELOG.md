@@ -6,7 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `as-https` checks present authorization-server metadata endpoints for HTTPS, failing public HTTP and warning for loopback HTTP used in local development.
 
 ## [0.1.1] - 2026-10-06
 

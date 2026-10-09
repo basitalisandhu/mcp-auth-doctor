@@ -11,6 +11,7 @@ Check ids (in order of execution):
   as-metadata               AS metadata found (RFC 8414, then OpenID Connect Discovery)
   as-issuer                 metadata `issuer` equals the issuer used for discovery
   as-endpoints              authorization_endpoint and token_endpoint present
+  as-https                  authorization server endpoints use HTTPS
   as-pkce                   code_challenge_methods_supported contains S256
   as-registration           registration_endpoint or client_id_metadata_document_supported
   as-iss                    authorization_response_iss_parameter_supported is true (RFC 9207)
@@ -29,6 +30,7 @@ import secrets
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -194,6 +196,7 @@ class _Diagnosis:
             "as-metadata",
             "as-issuer",
             "as-endpoints",
+            "as-https",
             "as-pkce",
             "as-registration",
             "as-iss",
@@ -445,6 +448,7 @@ class _Diagnosis:
         for check_id in (
             "as-issuer",
             "as-endpoints",
+            "as-https",
             "as-pkce",
             "as-registration",
             "as-iss",
@@ -500,6 +504,44 @@ class _Diagnosis:
                 authorization_endpoint=md["authorization_endpoint"],
                 token_endpoint=md["token_endpoint"],
             )
+
+        insecure = {
+            key: md[key]
+            for key in (
+                "authorization_endpoint",
+                "token_endpoint",
+                "registration_endpoint",
+                "jwks_uri",
+            )
+            if key in md
+            and (not isinstance(md[key], str) or not md[key].lower().startswith("https://"))
+        }
+        local_only = bool(insecure)
+        for value in insecure.values():
+            try:
+                parts = urlsplit(value) if isinstance(value, str) else None
+                local = (
+                    parts is not None
+                    and parts.scheme.lower() == "http"
+                    and parts.hostname in ("localhost", "127.0.0.1", "::1")
+                )
+            except ValueError:
+                local = False
+            local_only = local_only and local
+        if insecure:
+            self.add(
+                "as-https",
+                WARN if local_only else FAIL,
+                "authorization server endpoints MUST use HTTPS (MCP authorization, Security "
+                "Considerations); HTTP loopback is warned for local development"
+                if local_only
+                else "authorization server endpoints MUST use HTTPS (MCP authorization, Security "
+                "Considerations): " + ", ".join(insecure),
+                issuer=issuer,
+                endpoints=insecure,
+            )
+        else:
+            self.add("as-https", PASS, "authorization server endpoints use HTTPS", issuer=issuer)
 
         methods = md.get("code_challenge_methods_supported")
         if methods is None:
