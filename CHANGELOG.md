@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-16
+
+### Added
+
+- `as-https` also checks the issuer identifier: a public `http://` issuer fails even when its endpoints say `https`, because metadata fetched over plain HTTP can be altered in transit (RFC 8414 section 2). Loopback issuers warn, as loopback endpoints already did. The evidence carries `insecure_issuer`.
+- README: who it is for, a quick start and a sample on the first screen; example outputs regenerated from the demo server.
+
+### Fixed
+
+- `as-https` no longer fails when an optional endpoint such as `registration_endpoint` or `jwks_uri` is present as `null`; it is treated as absent.
+- `--login` with a `--callback-port` that is already in use crashed with a traceback; it now fails `login-token` with the port and the fix.
+- `--login` crashed when a `tools/list` reply had a `result` that was not an object; `login-tools-list` now fails with a clear reason.
+- The usage error for a plain `http://` URL now names `::1`, which was already accepted.
+
 ## [0.2.0] - 2026-10-09
 
 ### Added
@@ -33,7 +47,8 @@ All notable changes to this project are documented here. The format follows
 
 - Renamed the umbrella project from Hisar to Masoon; links, names and identifiers updated.
 
-[Unreleased]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/basitalisandhu/mcp-auth-doctor/releases/tag/v0.1.0

@@ -37,7 +37,7 @@ def validate_mcp_url(url: str) -> str:
     if parts.scheme == "http" and parts.hostname.lower() not in LOCAL_HOSTS:
         raise UrlError(
             "refusing plain http:// for a non-local host; OAuth requires https "
-            "(http is only accepted for localhost and 127.0.0.1)"
+            "(http is only accepted for localhost, 127.0.0.1 and ::1)"
         )
     if parts.fragment:
         raise UrlError("URL must not contain a fragment (RFC 8707 canonical URI)")

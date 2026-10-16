@@ -84,6 +84,46 @@ def test_public_failure_takes_precedence_over_loopback_warning(router):
     assert set(check.evidence["endpoints"]) == {"authorization_endpoint", "token_endpoint"}
 
 
+def test_null_optional_endpoints_are_treated_as_absent(router):
+    md = as_metadata()
+    md["registration_endpoint"] = None
+    md["jwks_uri"] = None
+    mount(router, metadata={AS: md})
+    check = by_id(diagnose(MCP), "as-https")
+    assert check.status == PASS, check.reason
+
+
+def test_plain_http_public_issuer_fails_even_with_https_endpoints(router):
+    issuer = "http://auth.example.com"
+    md = as_metadata(
+        issuer,
+        authorization_endpoint=f"{AS}/authorize",
+        token_endpoint=f"{AS}/token",
+        registration_endpoint=f"{AS}/register",
+    )
+    mount(router, issuers=(issuer,), metadata={issuer: md})
+    report = diagnose(MCP)
+    check = by_id(report, "as-https")
+    assert check.status == FAIL
+    assert check.evidence["insecure_issuer"] is True
+    assert "endpoints" not in check.evidence
+    assert check.reason.endswith(": the issuer")
+    assert report.exit_code == 1
+
+
+def test_loopback_issuer_and_endpoints_warn(router):
+    issuer = "http://127.0.0.1:9000"
+    mount(router, issuers=(issuer,), metadata={issuer: as_metadata(issuer)})
+    check = by_id(diagnose(MCP), "as-https")
+    assert check.status == WARN
+    assert check.evidence["insecure_issuer"] is True
+    assert set(check.evidence["endpoints"]) == {
+        "authorization_endpoint",
+        "token_endpoint",
+        "registration_endpoint",
+    }
+
+
 def test_json_document_shape(router):
     mount(router)
     doc = diagnose(MCP).to_dict()

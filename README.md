@@ -8,6 +8,25 @@ Checked against the MCP authorization specification, both the 2026-07-28 release
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 
+It is for people who run or build a remote MCP server, and for anyone whose MCP client says "OAuth failed" and wants to know which step broke.
+
+## Quick start
+
+```bash
+pipx install git+https://github.com/basitalisandhu/mcp-auth-doctor
+mcp-auth-doctor https://your-server.example.com/mcp      # read-only; add -v for evidence
+mcp-auth-doctor https://your-server.example.com/mcp --json > report.json
+```
+
+Against a server whose metadata `resource` has a trailing slash the MCP URL does not, and whose authorization server does not advertise PKCE (abridged from the [full example](#example-output)):
+
+```text
+  prm-resource               FAIL  resource differs from the MCP URL only by a trailing slash (resource has the slash): resource='http://127.0.0.1:8766/mcp/' url='http://127.0.0.1:8766/mcp'
+  as-pkce                    FAIL  `code_challenge_methods_supported` is absent; MCP clients MUST refuse to proceed (advertise ["S256"])
+
+9 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)
+```
+
 ## Why
 
 Remote MCP servers fail to authenticate for a short list of reasons, and the clients report all of them the same way: "OAuth failed", "cannot discover OAuth configuration", or nothing at all. The same faults keep being filed against different clients:
@@ -47,7 +66,7 @@ Once the package is on PyPI the short forms work too: `pipx install mcp-auth-doc
 Each release tag publishes `ghcr.io/basitalisandhu/mcp-auth-doctor` for linux/amd64 and linux/arm64, tagged with the version and `latest`. The image runs as uid 1000 with `/work` as the working directory:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/basitalisandhu/mcp-auth-doctor:0.2.0 https://host/mcp --json
+docker run --rm -v "$PWD:/work" ghcr.io/basitalisandhu/mcp-auth-doctor:0.3.0 https://host/mcp --json
 ```
 
 Inside a container, `127.0.0.1` is the container itself. To check a server on your machine, use the server's network address, or on Linux add `--network host`. The `--login` flow needs a browser and a loopback callback, so run it from a local install instead.
@@ -55,10 +74,10 @@ Inside a container, `127.0.0.1` is the container itself. To check a server on yo
 The image is signed with a keyless cosign signature and has a build provenance attestation and an SPDX SBOM (attached to the GitHub Release). To verify:
 
 ```bash
-cosign verify ghcr.io/basitalisandhu/mcp-auth-doctor:0.2.0 \
+cosign verify ghcr.io/basitalisandhu/mcp-auth-doctor:0.3.0 \
   --certificate-identity-regexp '^https://github.com/basitalisandhu/mcp-auth-doctor/\.github/workflows/publish-github-packages\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-gh attestation verify oci://ghcr.io/basitalisandhu/mcp-auth-doctor:0.2.0 --repo basitalisandhu/mcp-auth-doctor
+gh attestation verify oci://ghcr.io/basitalisandhu/mcp-auth-doctor:0.3.0 --repo basitalisandhu/mcp-auth-doctor
 ```
 
 ### pip
@@ -106,7 +125,7 @@ In execution order. The `as-*`, `dcr-probe` and `token-error-json` checks repeat
 | `as-metadata` | Metadata is found at `/.well-known/oauth-authorization-server[/path]`, then `/.well-known/openid-configuration[/path]`, then `/path/.well-known/openid-configuration`. | No document at any location clients try. | Serve RFC 8414 metadata at the root well-known path (path inserted after `.well-known/...` for issuers with a path), or OpenID Connect Discovery. |
 | `as-issuer` | The document's `issuer` is identical to the URL used for discovery. | Clients MUST NOT use the metadata (RFC 8414 section 3.3). | Make `issuer` exactly the value listed in `authorization_servers`. |
 | `as-endpoints` | `authorization_endpoint` and `token_endpoint` are absolute URLs. | Nothing to redirect to or redeem at. | Add both as absolute `https://` URLs. |
-| `as-https` | Present authorization, token, registration and JWKS endpoints use HTTPS. | Public non-HTTPS endpoints fail; HTTP on `localhost`, `127.0.0.1` or `::1` warns for development. | Serve endpoints over HTTPS as required by the [MCP authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#security-considerations). The loopback warning is a diagnostic accommodation, not an exception to that requirement. |
+| `as-https` | The issuer identifier and any present authorization, token, registration and JWKS endpoints use HTTPS. Optional members set to `null` count as absent. | A public non-HTTPS issuer or endpoint fails (metadata from a plain-HTTP issuer can be altered in transit, so even its `https` endpoints cannot be trusted); HTTP on `localhost`, `127.0.0.1` or `::1` warns for development. | Serve the issuer and every endpoint over HTTPS, as RFC 8414 section 2 and the [MCP authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#security-considerations) require. The loopback warning is a diagnostic accommodation, not an exception to that requirement. |
 | `as-pkce` | `code_challenge_methods_supported` contains `S256`. | MCP clients MUST refuse to proceed when the member is absent, including with OpenID Connect Discovery. | Add `"code_challenge_methods_supported": ["S256"]` and enforce PKCE at the token endpoint. |
 | `as-registration` | `client_id_metadata_document_supported` is true or `registration_endpoint` is present. | (warn) Clients without a pre-registered client id cannot register. Under 2026-07-28, DCR alone passes with a note that it is deprecated. | Support Client ID Metadata Documents (`client_id_metadata_document_supported: true`), or offer RFC 7591 registration, or document how users obtain a client id. |
 | `as-iss` | `authorization_response_iss_parameter_supported` is true. | (warn under 2026-07-28, skip under 2025-11-25) Clients cannot detect mix-up attacks; the spec says the server SHOULD send `iss`. | Include `iss` in every authorization response and advertise it (RFC 9207). |
@@ -121,7 +140,7 @@ Against [`scripts/demo_server.py`](scripts/demo_server.py), a standard-library M
 
 ```text
 $ mcp-auth-doctor http://127.0.0.1:8765/mcp
-mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
+mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
 
   unauth-401                 PASS  POST initialize without Authorization returned 401
   www-authenticate           PASS  Bearer challenge carries resource_metadata
@@ -131,8 +150,9 @@ mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
-  as-https                   WARN  authorization server endpoints MUST use HTTPS (MCP authorization, Security Considerations); HTTP loopback is warned for local development
+  as-https                   WARN  authorization server issuer and endpoints MUST use HTTPS (RFC 8414 section 2, MCP authorization, Security Considerations); HTTP loopback is warned for local development
                                    issuer: http://127.0.0.1:8765
+                                   insecure_issuer: True
                                    endpoints: {"authorization_endpoint":"http://127.0.0.1:8765/authorize","token_endpoint":"http://127.0.0.1:8765/token","registration_endpoint":"http://127.0.0.1:8765/register"}
   as-pkce                    PASS  PKCE S256 advertised
   as-registration            PASS  Client ID Metadata Documents and Dynamic Client Registration both available
@@ -149,7 +169,7 @@ The same script started with `--broken` reproduces three faults seen in the fiel
 
 ```text
 $ mcp-auth-doctor http://127.0.0.1:8766/mcp
-mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8766/mcp
+mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8766/mcp
 
   unauth-401                 PASS  POST initialize without Authorization returned 401
   www-authenticate           PASS  Bearer challenge carries resource_metadata
@@ -162,8 +182,9 @@ mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8766/mcp
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
-  as-https                   WARN  authorization server endpoints MUST use HTTPS (MCP authorization, Security Considerations); HTTP loopback is warned for local development
+  as-https                   WARN  authorization server issuer and endpoints MUST use HTTPS (RFC 8414 section 2, MCP authorization, Security Considerations); HTTP loopback is warned for local development
                                    issuer: http://127.0.0.1:8766
+                                   insecure_issuer: True
                                    endpoints: {"authorization_endpoint":"http://127.0.0.1:8766/authorize","token_endpoint":"http://127.0.0.1:8766/token","registration_endpoint":"http://127.0.0.1:8766/register"}
   as-pkce                    FAIL  `code_challenge_methods_supported` is absent; MCP clients MUST refuse to proceed (advertise ["S256"])
                                    issuer: http://127.0.0.1:8766
@@ -230,10 +251,10 @@ mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8766/mcp
     "exit_code": 1,
     "pass": 10,
     "fail": 3,
-    "warn": 0,
+    "warn": 1,
     "skip": 2,
     "spec": "2026-07-28",
-    "tool": "mcp-auth-doctor 0.2.0"
+    "tool": "mcp-auth-doctor 0.3.0"
   }
 }
 ```
@@ -244,7 +265,7 @@ mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8766/mcp
 $ mcp-auth-doctor http://127.0.0.1:8765/mcp --login --no-browser
 Open this URL to authorize:
   http://127.0.0.1:8765/authorize?response_type=code&client_id=demo-client&redirect_uri=http%3A%2F%2F127.0.0.1%3A42523%2Fcallback&code_challenge=...&code_challenge_method=S256&state=...&resource=http%3A%2F%2F127.0.0.1%3A8765%2Fmcp&scope=mcp%3Aread
-mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
+mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
 
   unauth-401                 PASS  POST initialize without Authorization returned 401
   www-authenticate           PASS  Bearer challenge carries resource_metadata
@@ -254,6 +275,10 @@ mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
+  as-https                   WARN  authorization server issuer and endpoints MUST use HTTPS (RFC 8414 section 2, MCP authorization, Security Considerations); HTTP loopback is warned for local development
+                                   issuer: http://127.0.0.1:8765
+                                   insecure_issuer: True
+                                   endpoints: {"authorization_endpoint":"http://127.0.0.1:8765/authorize","token_endpoint":"http://127.0.0.1:8765/token","registration_endpoint":"http://127.0.0.1:8765/register"}
   as-pkce                    PASS  PKCE S256 advertised
   as-registration            PASS  Client ID Metadata Documents and Dynamic Client Registration both available
   as-iss                     PASS  `iss` in authorization responses advertised (RFC 9207)
@@ -262,7 +287,7 @@ mcp-auth-doctor 0.2.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
   login-token                PASS  authorization code redeemed with PKCE and the `resource` parameter
   login-tools-list           PASS  tools/list returned 2 tool(s) with the bearer token
 
-14 pass, 0 fail, 0 warn, 1 skip. Verdict: PASS (exit 0)
+14 pass, 0 fail, 1 warn, 1 skip. Verdict: PASS (exit 0)
 ```
 
 To reproduce: `python scripts/demo_server.py --port 8765` in one terminal (add `--broken` for the second variant) and the commands above in another.

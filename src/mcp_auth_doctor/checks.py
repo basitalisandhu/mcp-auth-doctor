@@ -505,6 +505,8 @@ class _Diagnosis:
                 token_endpoint=md["token_endpoint"],
             )
 
+        # Optional members set to null are treated as absent: some servers serialise
+        # unset fields as null, and null is not an endpoint a client would call.
         insecure = {
             key: md[key]
             for key in (
@@ -513,35 +515,47 @@ class _Diagnosis:
                 "registration_endpoint",
                 "jwks_uri",
             )
-            if key in md
+            if md.get(key) is not None
             and (not isinstance(md[key], str) or not md[key].lower().startswith("https://"))
         }
-        local_only = bool(insecure)
-        for value in insecure.values():
-            try:
-                parts = urlsplit(value) if isinstance(value, str) else None
-                local = (
-                    parts is not None
-                    and parts.scheme.lower() == "http"
-                    and parts.hostname in ("localhost", "127.0.0.1", "::1")
+        # RFC 8414 section 2: the issuer identifier is a URL that uses the https scheme.
+        # Metadata fetched from a plain-http issuer can be altered in transit, so every
+        # endpoint in it is untrustworthy even when it says https.
+        insecure_issuer = not issuer.lower().startswith("https://")
+        flagged = [*insecure.values(), *([issuer] if insecure_issuer else [])]
+        local_only = bool(flagged) and all(_is_loopback_http(value) for value in flagged)
+        if flagged:
+            what = []
+            if insecure_issuer:
+                what.append("the issuer")
+            if insecure:
+                what.append(", ".join(insecure))
+            if local_only:
+                reason = (
+                    "authorization server issuer and endpoints MUST use HTTPS (RFC 8414 section "
+                    "2, MCP authorization, Security Considerations); HTTP loopback is warned for "
+                    "local development"
                 )
-            except ValueError:
-                local = False
-            local_only = local_only and local
-        if insecure:
+            else:
+                reason = (
+                    "authorization server issuer and endpoints MUST use HTTPS (RFC 8414 section "
+                    "2, MCP authorization, Security Considerations): " + " and ".join(what)
+                )
             self.add(
                 "as-https",
                 WARN if local_only else FAIL,
-                "authorization server endpoints MUST use HTTPS (MCP authorization, Security "
-                "Considerations); HTTP loopback is warned for local development"
-                if local_only
-                else "authorization server endpoints MUST use HTTPS (MCP authorization, Security "
-                "Considerations): " + ", ".join(insecure),
+                reason,
                 issuer=issuer,
-                endpoints=insecure,
+                insecure_issuer=insecure_issuer or None,
+                endpoints=insecure or None,
             )
         else:
-            self.add("as-https", PASS, "authorization server endpoints use HTTPS", issuer=issuer)
+            self.add(
+                "as-https",
+                PASS,
+                "authorization server issuer and endpoints use HTTPS",
+                issuer=issuer,
+            )
 
         methods = md.get("code_challenge_methods_supported")
         if methods is None:
@@ -849,6 +863,21 @@ class _Diagnosis:
 
 
 _UNREACHABLE = object()
+
+
+def _is_loopback_http(value: Any) -> bool:
+    """True for an http:// URL on localhost, 127.0.0.1 or ::1."""
+    if not isinstance(value, str):
+        return False
+    try:
+        parts = urlsplit(value)
+        return parts.scheme.lower() == "http" and parts.hostname in (
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        )
+    except ValueError:
+        return False
 
 
 def is_http_url(value: Any) -> bool:

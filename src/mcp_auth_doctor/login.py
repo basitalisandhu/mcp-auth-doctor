@@ -89,7 +89,21 @@ def run_login(
 
     callback = _Callback()
     handler = type("Handler", (_Handler,), {"callback": callback})
-    server = HTTPServer(("127.0.0.1", options.callback_port), handler)
+    try:
+        server = HTTPServer(("127.0.0.1", options.callback_port), handler)
+    except OSError as exc:
+        checks.append(
+            Check(
+                "login-token",
+                FAIL,
+                f"cannot listen for the authorization callback on 127.0.0.1 port "
+                f"{options.callback_port}: {describe(exc)}; free the port or choose another "
+                "with --callback-port",
+                {"issuer": issuer, "callback_port": options.callback_port},
+            )
+        )
+        checks.append(Check("login-tools-list", SKIP, "no token", {}))
+        return checks
     port = server.server_address[1]
     redirect_uri = f"http://127.0.0.1:{port}{CALLBACK_PATH}"
 
@@ -396,7 +410,15 @@ def _tools_list(client: httpx.Client, url: str, token: str, spec: str) -> Check:
             f"tools/list returned JSON-RPC error: {message['error']}",
             evidence,
         )
-    tools = (message.get("result") or {}).get("tools") or []
+    result = message.get("result")
+    tools = result.get("tools") if isinstance(result, dict) else None
+    if not isinstance(tools, list):
+        return Check(
+            "login-tools-list",
+            FAIL,
+            "tools/list reply has no `result.tools` list",
+            {**evidence, "body_preview": listed.text[:200]},
+        )
     names = [t.get("name") for t in tools if isinstance(t, dict)][:10]
     return Check(
         "login-tools-list",

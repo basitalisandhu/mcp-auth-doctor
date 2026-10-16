@@ -208,3 +208,158 @@ def test_login_skipped_by_default(router):
     report = diagnose(MCP)
     assert by_id(report, "login-token").status == SKIP
     assert "--login" in by_id(report, "login-token").reason
+
+
+def _login_options(**overrides) -> Options:
+    options = Options(login=True, open_browser=lambda url: None, login_timeout=0.3)
+    for key, value in overrides.items():
+        setattr(options, key, value)
+    return options
+
+
+def test_login_reports_a_busy_callback_port_instead_of_crashing(router):
+    import socket
+
+    mount(router)
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", 0))
+        busy.listen(1)
+        port = busy.getsockname()[1]
+        report = diagnose(MCP, _login_options(callback_port=port))
+    check = by_id(report, "login-token")
+    assert check.status == FAIL
+    assert f"port {port}" in check.reason and "--callback-port" in check.reason
+    assert by_id(report, "login-tools-list").status == SKIP
+
+
+def test_login_times_out_without_a_callback(router):
+    mount(router)
+    report = diagnose(MCP, _login_options())
+    check = by_id(report, "login-token")
+    assert check.status == FAIL and "no authorization response" in check.reason
+
+
+def test_login_registration_failures_are_named(router):
+    mount(router, dcr=(422, "text/html", "<html>nope</html>"))
+    reason = by_id(diagnose(MCP, _login_options()), "login-token").reason
+    assert "dynamic client registration failed: 422 with a non-JSON body" in reason
+    router.reset()
+    mount(router, dcr=(400, "application/json", '{"error":"invalid_redirect_uri"}'))
+    reason = by_id(diagnose(MCP, _login_options()), "login-token").reason
+    assert reason.endswith("400 invalid_redirect_uri")
+    router.reset()
+    mount(router, dcr=(201, "application/json", '{"client_name":"x"}'))
+    reason = by_id(diagnose(MCP, _login_options()), "login-token").reason
+    assert reason.endswith("201 without client_id")
+
+
+def _token_failure(router, response: httpx.Response):
+    mount(router, mcp_handler=mcp_handler_factory("tok-1"))
+    router.post(f"{AS}/token").mock(return_value=response)
+    return _drive_callback(router, {"code": "good-code", "iss": AS})
+
+
+def _drive_callback(router, query: dict, options: Options | None = None):
+    """Run diagnose with --login, answer the callback with `query` plus the right state."""
+    from urllib.parse import urlencode
+
+    captured: dict = {}
+    options = options or Options()
+    options.login = True
+    options.open_browser = lambda url: captured.__setitem__("url", url)
+    options.login_timeout = 10
+    result: dict = {}
+    thread = threading.Thread(target=lambda: result.__setitem__("report", diagnose(MCP, options)))
+    thread.start()
+    deadline = time.time() + 10
+    while "url" not in captured and time.time() < deadline:
+        time.sleep(0.02)
+    params = {k: v[0] for k, v in parse_qs(urlsplit(captured["url"]).query).items()}
+    full = {"state": params["state"], **query}
+    with urllib.request.urlopen(params["redirect_uri"] + "?" + urlencode(full), timeout=5):
+        pass
+    thread.join(timeout=10)
+    return result["report"]
+
+
+def test_login_token_endpoint_failures(router):
+    report = _token_failure(
+        router,
+        httpx.Response(200, content="access_token=x", headers={"Content-Type": "text/plain"}),
+    )
+    check = by_id(report, "login-token")
+    assert check.status == FAIL and "returned 200 with 'text/plain'" in check.reason
+    assert check.evidence["body_preview"] == "access_token=x"
+    router.reset()
+    report = _token_failure(router, httpx.Response(400, json={"error": "invalid_grant"}))
+    assert by_id(report, "login-token").reason == "token endpoint returned 400: invalid_grant"
+    router.reset()
+    report = _token_failure(router, httpx.Response(200, json={"token_type": "Bearer"}))
+    assert by_id(report, "login-token").reason == "token endpoint returned 200: no access_token"
+
+
+def test_login_without_code_fails(router):
+    mount(router)
+    report = _drive_callback(router, {"iss": AS})
+    assert by_id(report, "login-token").reason == "authorization response has no `code`"
+
+
+def _tools_list_failure(router, handler):
+    mount(router, mcp_handler=handler)
+    router.post(f"{AS}/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "tok-1", "token_type": "Bearer"})
+    )
+    report = _drive_callback(router, {"code": "c", "iss": AS})
+    assert by_id(report, "login-token").status == PASS
+    return by_id(report, "login-tools-list")
+
+
+def _authed(respond):
+    good = mcp_handler_factory("tok-1")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.headers.get("authorization") != "Bearer tok-1":
+            return good(request)
+        return respond(json.loads(request.content).get("method"), good, request)
+
+    return handler
+
+
+def test_login_tools_list_failures_are_named(router):
+    check = _tools_list_failure(
+        router,
+        _authed(
+            lambda method, good, req: httpx.Response(
+                401, headers={"WWW-Authenticate": 'Bearer error="invalid_token"'}
+            )
+        ),
+    )
+    assert check.status == FAIL and "does not accept its own" in check.reason
+    assert check.evidence["www_authenticate"] == 'Bearer error="invalid_token"'
+
+    router.reset()
+    check = _tools_list_failure(
+        router, _authed(lambda method, good, req: httpx.Response(500, text="boom"))
+    )
+    assert check.reason == "initialize with the token returned 500"
+
+    def tools_status(status, **kwargs):
+        def respond(method, good, req):
+            return httpx.Response(status, **kwargs) if method == "tools/list" else good(req)
+
+        return respond
+
+    router.reset()
+    check = _tools_list_failure(router, _authed(tools_status(403, text="denied")))
+    assert check.reason == "tools/list returned 403"
+    router.reset()
+    check = _tools_list_failure(router, _authed(tools_status(200, text="not json")))
+    assert check.reason == "tools/list reply could not be parsed as JSON-RPC"
+    router.reset()
+    error = {"jsonrpc": "2.0", "id": 2, "error": {"code": -32601, "message": "nope"}}
+    check = _tools_list_failure(router, _authed(tools_status(200, json=error)))
+    assert check.reason.startswith("tools/list returned JSON-RPC error")
+    router.reset()
+    odd = {"jsonrpc": "2.0", "id": 2, "result": ["alpha"]}
+    check = _tools_list_failure(router, _authed(tools_status(200, json=odd)))
+    assert check.reason == "tools/list reply has no `result.tools` list"
