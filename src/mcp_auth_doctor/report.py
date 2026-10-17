@@ -20,13 +20,37 @@ def render_table(report: Report, verbose: bool = False) -> str:
         if verbose or check.status in (FAIL, WARN):
             for line in _evidence_lines(check.evidence):
                 lines.append(f"  {' ' * width}        {line}")
-    counts = report.counts()
     lines.append("")
-    lines.append(
-        f"{counts['pass']} pass, {counts['fail']} fail, {counts['warn']} warn, "
-        f"{counts['skip']} skip. Verdict: {report.verdict.upper()} (exit {report.exit_code})"
-    )
+    lines.append(_summary(report))
     return "\n".join(lines)
+
+
+def render_markdown(report: Report, verbose: bool = False) -> str:
+    output = []
+
+    # Header
+    output.append(f"## mcp-auth-doctor {__version__}")
+    output.append("")
+    output.append(f"- Spec: {report.spec}")
+    output.append(f"- URL: `{report.url}`")
+    output.append("")
+
+    # Diagnostics
+    output.append("| Check | Status | Reason |")
+    output.append("|---|---|---|")
+    for check in report.checks:
+        label = STATUS_LABEL.get(check.status, check.status)
+        reason = _cell(check.reason)
+        if verbose or check.status in (FAIL, WARN):
+            evidence = _evidence_lines(check.evidence)
+            if evidence:
+                reason += "<br>" + "<br>".join(_cell(line) for line in evidence)
+        output.append(f"| {check.id} | {label} | {reason} |")
+    output.append("")
+
+    # Summary
+    output.append(_summary(report))
+    return "\n".join(output)
 
 
 def _evidence_lines(evidence: dict[str, Any]) -> list[str]:
@@ -54,4 +78,17 @@ def render_json(report: Report) -> str:
     return json.dumps(report.to_dict(), indent=2, sort_keys=False)
 
 
-__all__ = ["WARN", "render_json", "render_table"]
+def _cell(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\r", "").replace("\n", "<br>")
+
+
+def _summary(report: Report) -> str:
+    counts = report.counts()
+    return (
+        f"{counts['pass']} pass, {counts['fail']} fail, "
+        f"{counts['warn']} warn, {counts['skip']} skip. "
+        f"Verdict: {report.verdict.upper()} (exit {report.exit_code})"
+    )
+
+
+__all__ = ["WARN", "render_json", "render_markdown", "render_table"]

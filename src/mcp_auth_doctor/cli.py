@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from . import __version__
 from .checks import DEFAULT_SPEC, SPECS, Options, diagnose
 from .discovery import UrlError, validate_mcp_url
-from .report import render_json, render_table
+from .report import render_json, render_markdown, render_table
 
 EXIT_USAGE = 3
 
@@ -39,7 +39,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("url", help="MCP server URL (https; http only for localhost)")
     parser.add_argument(
-        "--json", action="store_true", help="print the JSON document instead of the table"
+        "--format",
+        choices=["text", "json", "markdown"],
+        default="text",
+        help="output format (default: text)",
+    )
+    parser.add_argument(
+        "--json",
+        dest="format",
+        action="store_const",
+        const="json",
+        default=argparse.SUPPRESS,
+        help="alias for --format json",
     )
     parser.add_argument(
         "--spec",
@@ -114,7 +125,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         open_browser=_print_url if args.no_browser else None,
     )
     report = diagnose(args.url, options)
-    print(render_json(report) if args.json else render_table(report, verbose=args.verbose))
+    if args.format == "json":
+        output = render_json(report)
+    elif args.format == "markdown":
+        output = render_markdown(report, verbose=args.verbose)
+    else:
+        output = render_table(report, verbose=args.verbose)
+
+    print(output)
     return report.exit_code
 
 

@@ -91,14 +91,15 @@ pip install mcp-auth-doctor
 ## Usage
 
 ```text
-mcp-auth-doctor <mcp-url> [--json] [--spec 2026-07-28|2025-11-25] [--dcr-probe] [--login]
+mcp-auth-doctor <mcp-url> [--format text|json|markdown] [--json] [--spec 2026-07-28|2025-11-25] [--dcr-probe] [--login]
                 [--client-id ID] [--callback-port N] [--login-timeout S] [--no-browser]
                 [--timeout S] [-v]
 ```
 
 | Option | Effect |
 |---|---|
-| `--json` | Print `{url, checks:[{id,status,reason,evidence}], summary}` instead of the table. |
+| `--format text\|json\|markdown` | Select the output format: `text` (default), `json` (structured JSON document), or `markdown` (Markdown table). |
+| `--json` | Alias for `--format json`; Print `{url, checks:[{id,status,reason,evidence}], summary}` instead of the table. |
 | `--spec` | Which specification's rules to apply where they differ (default `2026-07-28`, see below). |
 | `--dcr-probe` | Opt in: send one dynamic client registration (`application_type: "native"`, loopback redirect URI, no secret) and report the status code and whether the answer is JSON. |
 | `--login` | Opt in: run the authorization code flow with PKCE and a loopback callback, redeem the code with the `resource` parameter (RFC 8707), validate `iss`, then call `tools/list` with the token. Registers a client unless `--client-id` is given. |
