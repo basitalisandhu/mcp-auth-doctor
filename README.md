@@ -24,7 +24,7 @@ Against a server whose metadata `resource` has a trailing slash the MCP URL does
   prm-resource               FAIL  resource differs from the MCP URL only by a trailing slash (resource has the slash): resource='http://127.0.0.1:8766/mcp/' url='http://127.0.0.1:8766/mcp'
   as-pkce                    FAIL  `code_challenge_methods_supported` is absent; MCP clients MUST refuse to proceed (advertise ["S256"])
 
-9 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)
+10 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)
 ```
 
 ## Why
@@ -122,6 +122,7 @@ In execution order. The `as-*`, `dcr-probe` and `token-error-json` checks repeat
 | `prm-fetch` | The metadata is fetched from the header URL, else `/.well-known/oauth-protected-resource<path>`, then `/.well-known/oauth-protected-resource`. | None of the locations returned 200 JSON, or the header named a URL that does not work. | Serve the JSON document with 200 and `application/json` at the path-aware location (insert the well-known string between host and path) or at the root, and make the header URL point exactly there. |
 | `prm-resource` | `resource` equals the MCP URL (case-insensitive scheme and host, default port ignored). A difference that is only a trailing slash is named as such. | Clients will request a token for one audience and present it to another; the server then returns 401 after login. | Set `resource` to the exact URL clients use. The spec recommends the form without a trailing slash; whichever you choose, use it everywhere. |
 | `prm-authorization-servers` | `authorization_servers` is a non-empty list of issuer URLs. | Clients have nowhere to go. | List at least one issuer URL (the value whose metadata `issuer` is identical). |
+| `prm-scopes` | `scopes_supported` lists the scopes the server is willing to grant. The scope in the `WWW-Authenticate` challenge is checked against this list. | (warn) The server advertises a scope in the challenge that it does not list in `scopes_supported`; clients may not know what the server expects to receive. | Add a `scopes_supported` array with every scope the server is willing to accept in authorization requests, including the one used in the `WWW-Authenticate` challenge. |
 | `as-metadata` | Metadata is found at `/.well-known/oauth-authorization-server[/path]`, then `/.well-known/openid-configuration[/path]`, then `/path/.well-known/openid-configuration`. | No document at any location clients try. | Serve RFC 8414 metadata at the root well-known path (path inserted after `.well-known/...` for issuers with a path), or OpenID Connect Discovery. |
 | `as-issuer` | The document's `issuer` is identical to the URL used for discovery. | Clients MUST NOT use the metadata (RFC 8414 section 3.3). | Make `issuer` exactly the value listed in `authorization_servers`. |
 | `as-endpoints` | `authorization_endpoint` and `token_endpoint` are absolute URLs. | Nothing to redirect to or redeem at. | Add both as absolute `https://` URLs. |
@@ -147,6 +148,7 @@ mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
   prm-fetch                  PASS  Protected Resource Metadata fetched from the resource_metadata URL
   prm-resource               PASS  resource matches the MCP URL
   prm-authorization-servers  PASS  1 authorization server(s) listed
+  prm-scopes                 PASS  challenge scope is covered by scopes_supported
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
@@ -162,7 +164,7 @@ mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
   login-token                skip  pass --login to run the PKCE code flow
   login-tools-list           skip  pass --login to run the PKCE code flow
 
-12 pass, 0 fail, 1 warn, 3 skip. Verdict: PASS (exit 0)
+13 pass, 0 fail, 1 warn, 3 skip. Verdict: PASS (exit 0)
 ```
 
 The same script started with `--broken` reproduces three faults seen in the field, a trailing-slash mismatch, no PKCE advertised and a form-encoded token error:
@@ -179,6 +181,7 @@ mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8766/mcp
                                    url: http://127.0.0.1:8766/mcp
                                    trailing_slash_only: True
   prm-authorization-servers  PASS  1 authorization server(s) listed
+  prm-scopes                 PASS  challenge scope is covered by scopes_supported
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
@@ -200,7 +203,7 @@ mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8766/mcp
   login-token                skip  pass --login to run the PKCE code flow
   login-tools-list           skip  pass --login to run the PKCE code flow
 
-9 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)
+10 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)
 ```
 
 `--json` prints the whole document; three checks from the broken run with `--dcr-probe`:
@@ -249,7 +252,7 @@ mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8766/mcp
   "summary": {
     "verdict": "fail",
     "exit_code": 1,
-    "pass": 10,
+    "pass": 11,
     "fail": 3,
     "warn": 1,
     "skip": 2,
@@ -272,6 +275,7 @@ mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
   prm-fetch                  PASS  Protected Resource Metadata fetched from the resource_metadata URL
   prm-resource               PASS  resource matches the MCP URL
   prm-authorization-servers  PASS  1 authorization server(s) listed
+  prm-scopes                 PASS  challenge scope is covered by scopes_supported
   as-metadata                PASS  authorization server metadata found (oauth-authorization-server)
   as-issuer                  PASS  metadata `issuer` matches the issuer used for discovery
   as-endpoints               PASS  authorization_endpoint and token_endpoint present
@@ -287,7 +291,7 @@ mcp-auth-doctor 0.3.0  spec 2026-07-28  http://127.0.0.1:8765/mcp
   login-token                PASS  authorization code redeemed with PKCE and the `resource` parameter
   login-tools-list           PASS  tools/list returned 2 tool(s) with the bearer token
 
-14 pass, 0 fail, 1 warn, 1 skip. Verdict: PASS (exit 0)
+15 pass, 0 fail, 1 warn, 1 skip. Verdict: PASS (exit 0)
 ```
 
 To reproduce: `python scripts/demo_server.py --port 8765` in one terminal (add `--broken` for the second variant) and the commands above in another.
@@ -320,7 +324,7 @@ By default the tool only reads: one unauthenticated `initialize`, metadata `GET`
 
 ## Roadmap
 
-- Checks for `bearer_methods_supported`, HTTPS on every endpoint and challenge scope versus `scopes_supported` (see [docs/good-first-issues.md](docs/good-first-issues.md)).
+- Checks for `bearer_methods_supported` and HTTPS on every endpoint (see [docs/good-first-issues.md](docs/good-first-issues.md)).
 - Markdown output for pasting into issues, and extra request headers for servers behind access proxies.
 - Recording real server exchanges as fixtures so a reported failure can be replayed in the test suite.
 - A `--client-metadata-url` mode for `--login` on servers that support Client ID Metadata Documents, once a hosted document is available.

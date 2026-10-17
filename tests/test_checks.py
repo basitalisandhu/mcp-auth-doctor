@@ -10,6 +10,7 @@ ALL_IDS = [
     "prm-fetch",
     "prm-resource",
     "prm-authorization-servers",
+    "prm-scopes",
     "as-metadata",
     "as-issuer",
     "as-endpoints",
@@ -25,7 +26,7 @@ ALL_IDS = [
 
 
 def test_correct_server_passes_everything(router):
-    mount(router)
+    mount(router, prm_extra={"scopes_supported": ["mcp:read"]})
     report = diagnose(MCP)
     assert [c.id for c in report.checks] == ALL_IDS
     assert report.exit_code == 0 and report.verdict == "pass"
@@ -131,7 +132,7 @@ def test_json_document_shape(router):
     assert doc["url"] == MCP
     assert all(set(c) == {"id", "status", "reason", "evidence"} for c in doc["checks"])
     assert doc["summary"]["verdict"] == "pass" and doc["summary"]["exit_code"] == 0
-    assert doc["summary"]["pass"] == 13 and doc["summary"]["skip"] == 3
+    assert doc["summary"]["pass"] == 13 and doc["summary"]["skip"] == 4
     assert doc["summary"]["spec"] == "2026-07-28"
 
 
@@ -471,3 +472,36 @@ def test_unauthenticated_request_is_a_minimal_initialize(router):
 
     body = body_json(request)
     assert body["method"] == "initialize" and body["params"]["capabilities"] == {}
+
+
+def test_prm_scopes_skips_when_no_scopes_supported(router):
+    """prm-scopes is SKIP when PRM has no scopes_supported."""
+    mount(router, prm_extra={})
+    check = by_id(diagnose(MCP), "prm-scopes")
+    assert check.status == SKIP
+    assert "no scopes_supported" in check.reason
+
+
+def test_prm_scopes_warns_when_scope_not_covered(router):
+    """prm-scopes is WARN when challenge scope is not in scopes_supported."""
+    mount(router, prm_extra={"scopes_supported": ["mcp:write"]})
+    check = by_id(diagnose(MCP), "prm-scopes")
+    assert check.status == WARN
+    assert check.evidence["missing_scopes"] == ["mcp:read"]
+    assert "mcp:read" in check.reason
+
+
+def test_prm_scopes_passes_when_scope_is_covered(router):
+    """prm-scopes is PASS when challenge scope is in scopes_supported."""
+    mount(router, prm_extra={"scopes_supported": ["mcp:read"]})
+    check = by_id(diagnose(MCP), "prm-scopes")
+    assert check.status == PASS
+    assert "mcp:read" in check.evidence["scopes_supported"]
+
+
+def test_prm_scopes_ignores_non_string_entries(router):
+    """A malformed scopes_supported entry must not crash the whole diagnostic."""
+    mount(router, prm_extra={"scopes_supported": ["mcp:read", ["nested"], 5]})
+    check = by_id(diagnose(MCP), "prm-scopes")
+    assert check.status == PASS
+    assert check.evidence["scopes_supported"] == ["mcp:read", ["nested"], 5]
