@@ -6,13 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `--format text|json|markdown` selects the output format (text is the default); `--format markdown` prints the report as a Markdown table for pasting into an issue, and `--json` stays as an alias for `--format json`.
+
 ## [0.3.0] - 2026-10-16
 
 ### Added
 
 - `as-https` also checks the issuer identifier: a public `http://` issuer fails even when its endpoints say `https`, because metadata fetched over plain HTTP can be altered in transit (RFC 8414 section 2). Loopback issuers warn, as loopback endpoints already did. The evidence carries `insecure_issuer`.
 - README: who it is for, a quick start and a sample on the first screen; example outputs regenerated from the demo server.
-- Add `--format text|json|markdown` to select the report output format (text is the default); `--json` remains an alias for `--format json`. Markdown output renders the report as a Markdown table suitable for pasting into an issue.
 
 ### Fixed
 
