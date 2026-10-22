@@ -145,9 +145,9 @@ def test_json_document_shape(router):
         ({}, SKIP),
         ({"bearer_methods_supported": ["header"]}, PASS),
         ({"bearer_methods_supported": ["header", "query"]}, PASS),
-        ({"bearer_methods_supported": ["query"]}, WARN),
-        ({"bearer_methods_supported": ["body"]}, WARN),
-        ({"bearer_methods_supported": []}, WARN),
+        ({"bearer_methods_supported": ["query"]}, FAIL),
+        ({"bearer_methods_supported": ["body"]}, FAIL),
+        ({"bearer_methods_supported": []}, FAIL),
         ({"bearer_methods_supported": "header"}, WARN),
         ({"bearer_methods_supported": ["header", 1]}, WARN),
         ({"bearer_methods_supported": {}}, WARN),
@@ -160,8 +160,8 @@ def test_prm_bearer_methods(router, extra, status):
     report = diagnose(MCP)
     check = by_id(report, "prm-bearer-methods")
     assert check.status == status
-    assert report.exit_code == 0
-    if status == WARN:
+    assert report.exit_code == (1 if status == FAIL else 0)
+    if status in {WARN, FAIL}:
         assert "header" in check.reason
         assert check.evidence.get("bearer_methods_supported") == extra["bearer_methods_supported"]
 
