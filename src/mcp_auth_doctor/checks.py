@@ -8,6 +8,7 @@ Check ids (in order of execution):
   prm-fetch                 Protected Resource Metadata is reachable (RFC 9728)
   prm-resource              PRM `resource` equals the MCP URL (trailing slash flagged)
   prm-authorization-servers PRM lists at least one authorization server
+  prm-bearer-methods        PRM supports header bearer-token delivery (RFC 9728)
   prm-scopes                challenge scope is covered by scopes_supported (warn if not)
   as-metadata               AS metadata found (RFC 8414, then OpenID Connect Discovery)
   as-issuer                 metadata `issuer` equals the issuer used for discovery
@@ -213,6 +214,7 @@ class _Diagnosis:
             "prm-fetch",
             "prm-resource",
             "prm-authorization-servers",
+            "prm-bearer-methods",
             "prm-scopes",
         ):
             if check_id not in done:
@@ -415,6 +417,39 @@ class _Diagnosis:
                 authorization_servers=issuers,
                 scopes_supported=prm.get("scopes_supported"),
             )
+
+        # RFC 9728 section 2 says omission implies no supported-method default.
+        if "bearer_methods_supported" not in prm:
+            self.add(
+                "prm-bearer-methods",
+                SKIP,
+                "`bearer_methods_supported` is absent; RFC 9728 implies no default methods",
+            )
+        else:
+            methods = prm["bearer_methods_supported"]
+            valid = isinstance(methods, list) and all(isinstance(m, str) for m in methods)
+            if not valid:
+                self.add(
+                    "prm-bearer-methods",
+                    WARN,
+                    "`bearer_methods_supported` must be an array of strings advertising header",
+                    bearer_methods_supported=methods,
+                )
+            elif "header" not in methods:
+                self.add(
+                    "prm-bearer-methods",
+                    WARN,
+                    "`bearer_methods_supported` does not advertise header; "
+                    "MCP clients use Authorization",
+                    bearer_methods_supported=methods,
+                )
+            else:
+                self.add(
+                    "prm-bearer-methods",
+                    PASS,
+                    "header bearer-token delivery is supported",
+                    bearer_methods_supported=methods,
+                )
 
         # prm-scopes: warn when challenge scope is not in scopes_supported
         scopes_supported = prm.get("scopes_supported")
