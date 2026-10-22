@@ -73,6 +73,7 @@ class Options:
     callback_port: int = 0
     login_timeout: float = 180.0
     open_browser: Callable[[str], None] | None = None
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -230,7 +231,7 @@ class _Diagnosis:
             response = self.client.post(
                 self.url,
                 json=initialize_request(self.options.spec),
-                headers=mcp_headers(self.options.spec),
+                headers=mcp_headers(self.options.spec, extra_headers=self.options.headers),
             )
         except (httpx.HTTPError, ValueError) as exc:
             self.add("unauth-401", FAIL, f"could not reach the MCP URL: {describe(exc)}")
@@ -239,7 +240,17 @@ class _Diagnosis:
         status = response.status_code
         header = response.headers.get("www-authenticate")
         evidence: dict[str, Any] = {"status": status, "www_authenticate": header}
-        if status == 401:
+        auth_override = any(name.lower() == "authorization" for name in self.options.headers)
+        if auth_override and status in {200, 401}:
+            self.got_401 = status == 401
+            self.add(
+                "unauth-401",
+                WARN,
+                f"POST initialize with an Authorization override returned {status}; "
+                "unauthenticated protection was not checked",
+                **evidence,
+            )
+        elif status == 401:
             self.got_401 = True
             self.add(
                 "unauth-401", PASS, "POST initialize without Authorization returned 401", **evidence

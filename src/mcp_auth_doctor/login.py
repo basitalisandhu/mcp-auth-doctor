@@ -293,7 +293,9 @@ def run_login(
                 evidence,
             )
         )
-        checks.append(_tools_list(client, url, str(token["access_token"]), options.spec))
+        checks.append(
+            _tools_list(client, url, str(token["access_token"]), options.spec, options.headers)
+        )
         return checks
     finally:
         server.shutdown()
@@ -354,10 +356,20 @@ def _check_iss(md: dict[str, Any], params: dict[str, str], spec: str) -> str | N
     return None
 
 
-def _tools_list(client: httpx.Client, url: str, token: str, spec: str) -> Check:
+def _tools_list(
+    client: httpx.Client,
+    url: str,
+    token: str,
+    spec: str,
+    extra_headers: dict[str, str] | None = None,
+) -> Check:
     evidence: dict[str, Any] = {}
     try:
-        init = client.post(url, json=initialize_request(spec, 1), headers=mcp_headers(spec, token))
+        init = client.post(
+            url,
+            json=initialize_request(spec, 1),
+            headers=mcp_headers(spec, token, extra_headers=extra_headers),
+        )
     except (httpx.HTTPError, ValueError) as exc:
         return Check(
             "login-tools-list", FAIL, f"initialize with the token failed: {describe(exc)}", evidence
@@ -379,7 +391,7 @@ def _tools_list(client: httpx.Client, url: str, token: str, spec: str) -> Check:
             {**evidence, "body_preview": init.text[:200]},
         )
     session = init.headers.get("mcp-session-id")
-    headers = mcp_headers(spec, token, session)
+    headers = mcp_headers(spec, token, session, extra_headers=extra_headers)
     try:
         client.post(
             url, json={"jsonrpc": "2.0", "method": "notifications/initialized"}, headers=headers

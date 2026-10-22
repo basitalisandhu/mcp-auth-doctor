@@ -8,6 +8,7 @@ not be reached), 3 usage error.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from collections.abc import Sequence
 
@@ -26,6 +27,22 @@ class _Parser(argparse.ArgumentParser):
         sys.exit(EXIT_USAGE)
 
 
+def _header(value: str) -> tuple[str, str]:
+    name, separator, content = value.partition(":")
+    name, content = name.strip(), content.strip()
+    if (
+        not separator
+        or not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", name)
+        or any(ord(c) < 32 or ord(c) > 126 for c in content)
+        or "\r" in value
+        or "\n" in value
+    ):
+        raise argparse.ArgumentTypeError(
+            "expected an ASCII HTTP header with a nonempty name and colon"
+        )
+    return name.lower(), content
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="mcp-auth-doctor",
@@ -38,6 +55,14 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="Exit codes: 0 all pass, 1 any fail, 2 inconclusive, 3 usage error.",
     )
     parser.add_argument("url", help="MCP server URL (https; http only for localhost)")
+    parser.add_argument(
+        "-H",
+        "--header",
+        action="append",
+        type=_header,
+        default=[],
+        help="extra MCP request header 'Name: value' (repeatable; never sent to OAuth endpoints)",
+    )
     parser.add_argument(
         "--format",
         choices=["text", "json", "markdown"],
@@ -123,7 +148,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         callback_port=args.callback_port,
         login_timeout=args.login_timeout,
         open_browser=_print_url if args.no_browser else None,
+        headers=dict(args.header),
     )
+    if "authorization" in options.headers:
+        print(
+            "warning: an Authorization override was supplied; the initial MCP request "
+            "is not an unauthenticated probe",
+            file=sys.stderr,
+        )
     report = diagnose(args.url, options)
     if args.format == "json":
         output = render_json(report)
