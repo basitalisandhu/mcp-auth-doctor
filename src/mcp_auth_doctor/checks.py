@@ -446,7 +446,7 @@ class _Diagnosis:
             elif "header" not in methods:
                 self.add(
                     "prm-bearer-methods",
-                    WARN,
+                    FAIL,
                     "`bearer_methods_supported` does not advertise header; "
                     "MCP clients use Authorization",
                     bearer_methods_supported=methods,
