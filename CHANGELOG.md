@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `prm-bearer-methods` checks protected-resource metadata: omission skips because RFC 9728 implies no default methods, valid arrays including `header` pass, and malformed values or arrays omitting `header` warn without changing the exit code.
 - `--format text|json|markdown` selects the output format (text is the default); `--format markdown` prints the report as a Markdown table for pasting into an issue, and `--json` stays as an alias for `--format json`.
 
 ## [0.3.0] - 2026-10-16
