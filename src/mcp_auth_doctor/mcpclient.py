@@ -8,6 +8,7 @@ be plain JSON or a text/event-stream body; both are handled.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Any
 
 import httpx
@@ -19,13 +20,28 @@ MCP_PROTOCOL_VERSIONS = {"2026-07-28": "2026-07-28", "2025-11-25": "2025-11-25"}
 ACCEPT = "application/json, text/event-stream"
 
 
-def mcp_headers(spec: str, token: str | None = None, session: str | None = None) -> dict[str, str]:
+def mcp_headers(
+    spec: str,
+    token: str | None = None,
+    session: str | None = None,
+    extra_headers: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    if any(name.lower() == "authorization" for name in (extra_headers or {})):
+        raise ValueError("Authorization is not allowed in extra headers; use the login flow")
+    reserved = {"accept", "content-type", "mcp-protocol-version", "user-agent", "mcp-session-id"}
+    if token:
+        reserved.add("authorization")
     headers = {
-        "Accept": ACCEPT,
-        "Content-Type": "application/json",
-        "MCP-Protocol-Version": MCP_PROTOCOL_VERSIONS.get(spec, spec),
-        "User-Agent": f"mcp-auth-doctor/{__version__}",
+        name: value for name, value in (extra_headers or {}).items() if name.lower() not in reserved
     }
+    headers.update(
+        {
+            "Accept": ACCEPT,
+            "Content-Type": "application/json",
+            "MCP-Protocol-Version": MCP_PROTOCOL_VERSIONS.get(spec, spec),
+            "User-Agent": f"mcp-auth-doctor/{__version__}",
+        }
+    )
     if token:
         headers["Authorization"] = f"Bearer {token}"
     if session:

@@ -27,6 +27,14 @@ Against a server whose metadata `resource` has a trailing slash the MCP URL does
 10 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)
 ```
 
+For a gateway that requires a tenant or routing header, repeat `-H/--header`:
+
+```sh
+mcp-auth-doctor https://your-server.example.com/mcp -H 'X-Tenant: demo' -H 'X-Trace: abc'
+```
+
+These headers go only to the MCP URL, including authenticated calls with `--login`, never to protected-resource metadata, authorization-server discovery, client registration or token requests. Repeating a name is case-insensitive and the last value wins. MCP protocol, content-type, accept and session headers are managed by the tool. `Authorization` is rejected case-insensitively before any network request, so the initial probe remains unauthenticated; use `--login` for OAuth bearer authentication. Header values are not added to reports; avoid putting real credentials in shell history or shared process arguments.
+
 ## Why
 
 Remote MCP servers fail to authenticate for a short list of reasons, and the clients report all of them the same way: "OAuth failed", "cannot discover OAuth configuration", or nothing at all. The same faults keep being filed against different clients:

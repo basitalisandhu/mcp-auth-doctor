@@ -20,6 +20,8 @@ By default `mcp-auth-doctor` only reads:
 - `GET` requests for the protected resource metadata and authorization server metadata documents at their well-known locations,
 - one `POST` to the token endpoint with a deliberately invalid authorization code, to see whether the error comes back as `application/json`. This creates no state on the server and uses no credentials.
 
+`-H/--header` sends user-supplied headers only to the MCP URL (also on authenticated MCP calls). They are never forwarded to metadata discovery, registration or token endpoints, and values are not added to diagnostic reports. Authorization overrides are rejected case-insensitively before network access; use `--login` for bearer authentication. Avoid placing sensitive header values in shell history or shared process arguments.
+
 Two flags are opt-in and documented in the README because they go beyond reading:
 
 - `--dcr-probe` sends one dynamic client registration request (`application_type: "native"`, redirect URI `http://127.0.0.1:1/callback`, no client secret). Authorization servers that accept it will create a throwaway client record; the tool never uses it.

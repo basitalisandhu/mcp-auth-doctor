@@ -73,6 +73,7 @@ class Options:
     callback_port: int = 0
     login_timeout: float = 180.0
     open_browser: Callable[[str], None] | None = None
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -130,6 +131,8 @@ def diagnose(
     """Run every check against `url` and return the report. Never raises for HTTP
     or network trouble; those become failed or skipped checks."""
     options = options or Options()
+    if any(name.lower() == "authorization" for name in options.headers):
+        raise ValueError("Authorization is not allowed in extra headers; use the login flow")
     own_client = client is None
     client = client or make_client(options.timeout)
     try:
@@ -230,7 +233,7 @@ class _Diagnosis:
             response = self.client.post(
                 self.url,
                 json=initialize_request(self.options.spec),
-                headers=mcp_headers(self.options.spec),
+                headers=mcp_headers(self.options.spec, extra_headers=self.options.headers),
             )
         except (httpx.HTTPError, ValueError) as exc:
             self.add("unauth-401", FAIL, f"could not reach the MCP URL: {describe(exc)}")
