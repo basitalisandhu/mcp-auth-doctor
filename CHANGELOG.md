@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `prm-bearer-methods` checks protected-resource metadata: a `bearer_methods_supported` array omitting `header` fails, a malformed value warns, and an absent member passes (MCP clients send the token in the Authorization header).
+
 ## [0.4.0] - 2026-10-28
 
 ### Added
