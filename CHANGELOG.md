@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- Repeatable `-H/--header 'Name: value'` sends extra headers only to MCP requests, including authenticated initialize, initialized and tools/list. Discovery, registration and token requests never receive them. Malformed headers are usage errors without echoing their values; an Authorization override warns that the initial request is no longer unauthenticated.
+- Repeatable `-H/--header 'Name: value'` sends extra headers only to MCP requests, including authenticated initialize, initialized and tools/list. Discovery, registration and token requests never receive them. Malformed headers and Authorization overrides are usage errors without echoing their values or making network requests.
 - `--format text|json|markdown` selects the output format (text is the default); `--format markdown` prints the report as a Markdown table for pasting into an issue, and `--json` stays as an alias for `--format json`.
 
 ## [0.3.0] - 2026-10-16

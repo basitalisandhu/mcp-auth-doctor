@@ -5,7 +5,7 @@ import json
 import httpx
 import pytest
 
-from mcp_auth_doctor.checks import WARN, Options, diagnose
+from mcp_auth_doctor.checks import Options, diagnose
 from mcp_auth_doctor.cli import main
 from mcp_auth_doctor.mcpclient import mcp_headers
 from tests.conftest import AS, MCP, by_id, mount
@@ -58,22 +58,11 @@ def test_headers_are_sent_on_authenticated_mcp_requests_only(router):
     assert authenticated == ["initialize", "notifications/initialized", "tools/list"]
 
 
-@pytest.mark.parametrize("status", [200, 401])
-def test_authorization_override_does_not_claim_an_unauthenticated_probe(router, status):
-    mount(router, unauth_status=status)
-    report = diagnose(MCP, Options(headers={"aUtHoRiZaTiOn": "Bearer synthetic"}))
-    check = by_id(report, "unauth-401")
-    assert check.status == WARN
-    assert "Authorization" in check.reason
-    assert "synthetic" not in json.dumps(report.to_dict())
-
-
-def test_cli_warns_about_authorization_without_echoing_it(router, capsys):
-    mount(router)
-    assert main([MCP, "-H", "Authorization: Bearer synthetic", "--json"]) == 0
-    captured = capsys.readouterr()
-    assert "Authorization" in captured.err
-    assert "synthetic" not in captured.out + captured.err
+@pytest.mark.parametrize("name", ["Authorization", "authorization", "aUtHoRiZaTiOn"])
+def test_python_api_rejects_authorization_before_network(router, name):
+    with pytest.raises(ValueError, match="Authorization is not allowed"):
+        diagnose(MCP, Options(headers={name: "Bearer synthetic"}))
+    assert len(router.calls) == 0
 
 
 @pytest.mark.parametrize(
@@ -106,7 +95,6 @@ def test_mcp_protocol_and_session_headers_take_precedence():
                 "content-type": "wrong",
                 "mcp-protocol-version": "wrong",
                 "mcp-session-id": "wrong",
-                "authorization": "Bearer override",
                 "X-Tenant": "demo",
             },
         )

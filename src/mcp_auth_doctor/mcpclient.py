@@ -26,6 +26,8 @@ def mcp_headers(
     session: str | None = None,
     extra_headers: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
+    if any(name.lower() == "authorization" for name in (extra_headers or {})):
+        raise ValueError("Authorization is not allowed in extra headers; use the login flow")
     reserved = {"accept", "content-type", "mcp-protocol-version", "user-agent", "mcp-session-id"}
     if token:
         reserved.add("authorization")

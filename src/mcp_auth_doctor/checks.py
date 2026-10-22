@@ -131,6 +131,8 @@ def diagnose(
     """Run every check against `url` and return the report. Never raises for HTTP
     or network trouble; those become failed or skipped checks."""
     options = options or Options()
+    if any(name.lower() == "authorization" for name in options.headers):
+        raise ValueError("Authorization is not allowed in extra headers; use the login flow")
     own_client = client is None
     client = client or make_client(options.timeout)
     try:
@@ -240,17 +242,7 @@ class _Diagnosis:
         status = response.status_code
         header = response.headers.get("www-authenticate")
         evidence: dict[str, Any] = {"status": status, "www_authenticate": header}
-        auth_override = any(name.lower() == "authorization" for name in self.options.headers)
-        if auth_override and status in {200, 401}:
-            self.got_401 = status == 401
-            self.add(
-                "unauth-401",
-                WARN,
-                f"POST initialize with an Authorization override returned {status}; "
-                "unauthenticated protection was not checked",
-                **evidence,
-            )
-        elif status == 401:
+        if status == 401:
             self.got_401 = True
             self.add(
                 "unauth-401", PASS, "POST initialize without Authorization returned 401", **evidence

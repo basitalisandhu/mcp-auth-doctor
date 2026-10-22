@@ -16,11 +16,11 @@ You will get an acknowledgement within 7 days and a fix or a mitigation plan wit
 
 By default `mcp-auth-doctor` only reads:
 
-- one unauthenticated `POST` of a JSON-RPC `initialize` message to the MCP URL you give it (to provoke the 401 challenge), unless you explicitly supply an Authorization header with `-H/--header`,
+- one unauthenticated `POST` of a JSON-RPC `initialize` message to the MCP URL you give it (to provoke the 401 challenge),
 - `GET` requests for the protected resource metadata and authorization server metadata documents at their well-known locations,
 - one `POST` to the token endpoint with a deliberately invalid authorization code, to see whether the error comes back as `application/json`. This creates no state on the server and uses no credentials.
 
-`-H/--header` sends user-supplied headers only to the MCP URL (also on authenticated MCP calls). They are never forwarded to metadata discovery, registration or token endpoints, and values are not added to diagnostic reports. Supplying Authorization means the initial request no longer tests unauthenticated protection; the tool warns rather than claiming that it does. Avoid placing sensitive header values in shell history or shared process arguments.
+`-H/--header` sends user-supplied headers only to the MCP URL (also on authenticated MCP calls). They are never forwarded to metadata discovery, registration or token endpoints, and values are not added to diagnostic reports. Authorization overrides are rejected case-insensitively before network access; use `--login` for bearer authentication. Avoid placing sensitive header values in shell history or shared process arguments.
 
 Two flags are opt-in and documented in the README because they go beyond reading:
 

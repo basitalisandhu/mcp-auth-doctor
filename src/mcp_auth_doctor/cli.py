@@ -40,6 +40,10 @@ def _header(value: str) -> tuple[str, str]:
         raise argparse.ArgumentTypeError(
             "expected an ASCII HTTP header with a nonempty name and colon"
         )
+    if name.lower() == "authorization":
+        raise argparse.ArgumentTypeError(
+            "Authorization is not allowed in --header; use --login for bearer authentication"
+        )
     return name.lower(), content
 
 
@@ -150,12 +154,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         open_browser=_print_url if args.no_browser else None,
         headers=dict(args.header),
     )
-    if "authorization" in options.headers:
-        print(
-            "warning: an Authorization override was supplied; the initial MCP request "
-            "is not an unauthenticated probe",
-            file=sys.stderr,
-        )
     report = diagnose(args.url, options)
     if args.format == "json":
         output = render_json(report)

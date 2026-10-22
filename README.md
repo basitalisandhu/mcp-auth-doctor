@@ -33,7 +33,7 @@ For a gateway that requires a tenant or routing header, repeat `-H/--header`:
 mcp-auth-doctor https://your-server.example.com/mcp -H 'X-Tenant: demo' -H 'X-Trace: abc'
 ```
 
-These headers go only to the MCP URL, including authenticated calls with `--login`, never to protected-resource metadata, authorization-server discovery, client registration or token requests. Repeating a name is case-insensitive and the last value wins. MCP protocol, content-type, accept and session headers are managed by the tool; a login token takes precedence over a supplied Authorization header. An explicit `-H 'Authorization: Bearer …'` warns that the initial request is no longer unauthenticated, so `unauth-401` cannot establish whether the endpoint is protected. Header values are not added to reports; avoid putting real credentials in shell history or shared process arguments.
+These headers go only to the MCP URL, including authenticated calls with `--login`, never to protected-resource metadata, authorization-server discovery, client registration or token requests. Repeating a name is case-insensitive and the last value wins. MCP protocol, content-type, accept and session headers are managed by the tool. `Authorization` is rejected case-insensitively before any network request, so the initial probe remains unauthenticated; use `--login` for OAuth bearer authentication. Header values are not added to reports; avoid putting real credentials in shell history or shared process arguments.
 
 ## Why
 
