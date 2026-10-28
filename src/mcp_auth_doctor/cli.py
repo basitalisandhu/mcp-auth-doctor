@@ -217,11 +217,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return EXIT_USAGE
     if args.format == "json":
-        output = render_json(report)
+        output = render_json(report, replayed_from=args.replay)
     elif args.format == "markdown":
-        output = render_markdown(report, verbose=args.verbose)
+        output = render_markdown(report, verbose=args.verbose, replayed_from=args.replay)
     else:
-        output = render_table(report, verbose=args.verbose)
+        output = render_table(report, verbose=args.verbose, replayed_from=args.replay)
 
     print(printable(output))
     return report.exit_code

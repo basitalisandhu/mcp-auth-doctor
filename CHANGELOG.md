@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `prm-bearer-methods` checks protected-resource metadata: a `bearer_methods_supported` array omitting `header` fails, a malformed value warns, and an absent member passes (MCP clients send the token in the Authorization header).
 - `--replay -` reads the exchanges file from standard input, so a run can be piped straight from `curl` or an issue attachment without saving it first; the same 50 MB limit and error messages apply, with `<stdin>` in place of the file name.
 
 ## [0.4.0] - 2026-10-28

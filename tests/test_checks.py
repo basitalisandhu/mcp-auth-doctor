@@ -10,6 +10,7 @@ ALL_IDS = [
     "prm-fetch",
     "prm-resource",
     "prm-authorization-servers",
+    "prm-bearer-methods",
     "prm-scopes",
     "as-metadata",
     "as-issuer",
@@ -26,7 +27,9 @@ ALL_IDS = [
 
 
 def test_correct_server_passes_everything(router):
-    mount(router, prm_extra={"scopes_supported": ["mcp:read"]})
+    mount(
+        router, prm_extra={"scopes_supported": ["mcp:read"], "bearer_methods_supported": ["header"]}
+    )
     report = diagnose(MCP)
     assert [c.id for c in report.checks] == ALL_IDS
     assert report.exit_code == 0 and report.verdict == "pass"
@@ -132,8 +135,41 @@ def test_json_document_shape(router):
     assert doc["url"] == MCP
     assert all(set(c) == {"id", "status", "reason", "evidence"} for c in doc["checks"])
     assert doc["summary"]["verdict"] == "pass" and doc["summary"]["exit_code"] == 0
-    assert doc["summary"]["pass"] == 13 and doc["summary"]["skip"] == 4
+    assert doc["summary"]["pass"] == 14 and doc["summary"]["skip"] == 4
     assert doc["summary"]["spec"] == "2026-07-28"
+
+
+@pytest.mark.parametrize(
+    "extra, status",
+    [
+        ({}, PASS),
+        ({"bearer_methods_supported": ["header"]}, PASS),
+        ({"bearer_methods_supported": ["header", "query"]}, PASS),
+        ({"bearer_methods_supported": ["query"]}, FAIL),
+        ({"bearer_methods_supported": ["body"]}, FAIL),
+        ({"bearer_methods_supported": ["body", "query"]}, FAIL),
+        ({"bearer_methods_supported": []}, FAIL),
+        ({"bearer_methods_supported": "header"}, WARN),
+        ({"bearer_methods_supported": ["header", 1]}, WARN),
+        ({"bearer_methods_supported": {}}, WARN),
+        ({"bearer_methods_supported": None}, WARN),
+        ({"bearer_methods_supported": 1}, WARN),
+    ],
+)
+def test_prm_bearer_methods(router, extra, status):
+    mount(router, prm_extra=extra)
+    report = diagnose(MCP)
+    check = by_id(report, "prm-bearer-methods")
+    assert check.status == status
+    assert report.exit_code == (1 if status == FAIL else 0)
+    if status in {WARN, FAIL}:
+        assert "header" in check.reason
+        assert check.evidence.get("bearer_methods_supported") == extra["bearer_methods_supported"]
+
+
+def test_prm_bearer_methods_skips_without_metadata(router):
+    mount(router, prm_urls=())
+    assert by_id(diagnose(MCP), "prm-bearer-methods").status == SKIP
 
 
 def test_trailing_slash_mismatch_fails_explicitly(router):

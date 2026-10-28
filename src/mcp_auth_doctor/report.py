@@ -11,8 +11,9 @@ from .checks import FAIL, WARN, Report
 STATUS_LABEL = {"pass": "PASS", "fail": "FAIL", "warn": "WARN", "skip": "skip"}
 
 
-def render_table(report: Report, verbose: bool = False) -> str:
-    lines = [f"mcp-auth-doctor {__version__}  spec {report.spec}  {report.url}", ""]
+def render_table(report: Report, verbose: bool = False, *, replayed_from: str | None = None) -> str:
+    source = f" (replayed from {replayed_from})" if replayed_from is not None else ""
+    lines = [f"mcp-auth-doctor {__version__}  spec {report.spec}  {report.url}{source}", ""]
     width = max(len(c.id) for c in report.checks) if report.checks else 10
     for check in report.checks:
         label = STATUS_LABEL.get(check.status, check.status)
@@ -25,14 +26,17 @@ def render_table(report: Report, verbose: bool = False) -> str:
     return "\n".join(lines)
 
 
-def render_markdown(report: Report, verbose: bool = False) -> str:
+def render_markdown(
+    report: Report, verbose: bool = False, *, replayed_from: str | None = None
+) -> str:
     output = []
 
     # Header
     output.append(f"## mcp-auth-doctor {__version__}")
     output.append("")
     output.append(f"- Spec: {report.spec}")
-    output.append(f"- URL: `{report.url}`")
+    source = f" (replayed from {_cell(replayed_from)})" if replayed_from is not None else ""
+    output.append(f"- URL: `{report.url}`{source}")
     output.append("")
 
     # Diagnostics
@@ -74,8 +78,11 @@ def _evidence_lines(evidence: dict[str, Any]) -> list[str]:
     return lines
 
 
-def render_json(report: Report) -> str:
-    return json.dumps(report.to_dict(), indent=2, sort_keys=False)
+def render_json(report: Report, *, replayed_from: str | None = None) -> str:
+    document = report.to_dict()
+    if replayed_from is not None:
+        document["replayed_from"] = replayed_from
+    return json.dumps(document, indent=2, sort_keys=False)
 
 
 def _cell(text: str) -> str:
