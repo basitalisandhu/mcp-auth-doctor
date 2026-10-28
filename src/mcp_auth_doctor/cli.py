@@ -12,9 +12,12 @@ import re
 import sys
 from collections.abc import Sequence
 
+import httpx
+
 from . import __version__
 from .checks import DEFAULT_SPEC, SPECS, Options, diagnose
 from .discovery import UrlError, validate_mcp_url
+from .exchanges import ExchangeFileError, RecordingTransport, ReplayTransport, load
 from .report import render_json, render_markdown, render_table
 
 EXIT_USAGE = 3
@@ -58,7 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog="Exit codes: 0 all pass, 1 any fail, 2 inconclusive, 3 usage error.",
     )
-    parser.add_argument("url", help="MCP server URL (https; http only for localhost)")
+    parser.add_argument(
+        "url",
+        nargs="?",
+        help="MCP server URL (https; http only for localhost); optional with --replay",
+    )
     parser.add_argument(
         "-H",
         "--header",
@@ -119,6 +126,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="with --login, print the authorization URL instead of opening a browser",
     )
     parser.add_argument(
+        "--record",
+        metavar="FILE",
+        help="save every HTTP exchange of this run to FILE (secrets redacted; not with --login)",
+    )
+    parser.add_argument(
+        "--replay",
+        metavar="FILE",
+        help="run the checks against exchanges saved with --record instead of the network",
+    )
+    parser.add_argument(
         "--timeout", type=float, default=10.0, help="HTTP timeout in seconds (default 10)"
     )
     parser.add_argument(
@@ -134,6 +151,23 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    replay = None
+    if args.record and args.replay:
+        parser.error("--record and --replay cannot be combined")
+    if (args.record or args.replay) and args.login:
+        parser.error("--login cannot be combined with --record or --replay")
+    if args.replay:
+        try:
+            recorded_url, exchanges = load(args.replay)
+        except ExchangeFileError as exc:
+            print(f"{parser.prog}: error: {exc}", file=sys.stderr)
+            return EXIT_USAGE
+        if args.url and args.url != recorded_url:
+            parser.error(f"the replay file was recorded for {recorded_url}, not {args.url}")
+        args.url = recorded_url
+        replay = ReplayTransport(exchanges)
+    if not args.url:
+        parser.error("the following arguments are required: url")
     try:
         validate_mcp_url(args.url)
     except UrlError as exc:
@@ -154,7 +188,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         open_browser=_print_url if args.no_browser else None,
         headers=dict(args.header),
     )
-    report = diagnose(args.url, options)
+    transport: httpx.BaseTransport | None = replay
+    if args.record:
+        transport = RecordingTransport()
+    client = None
+    if transport is not None:
+        # The same settings as checks.make_client, on the recording or replay transport.
+        client = httpx.Client(
+            transport=transport,
+            timeout=args.timeout,
+            follow_redirects=False,
+            headers={"User-Agent": f"mcp-auth-doctor/{__version__}"},
+        )
+    try:
+        report = diagnose(args.url, options, client=client)
+    finally:
+        if client is not None:
+            client.close()
+    if isinstance(transport, RecordingTransport):
+        try:
+            transport.write(args.record, args.url)
+        except OSError as exc:
+            print(
+                f"{parser.prog}: error: cannot write {args.record}: {exc.strerror}", file=sys.stderr
+            )
+            return EXIT_USAGE
     if args.format == "json":
         output = render_json(report)
     elif args.format == "markdown":
@@ -162,8 +220,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         output = render_table(report, verbose=args.verbose)
 
-    print(output)
+    print(printable(output))
     return report.exit_code
+
+
+def printable(text: str) -> str:
+    """Escape lone surrogates so the report always prints.
+
+    A JSON body can carry an escaped lone surrogate ("\\udcff"), which json decodes into a
+    str that UTF-8 cannot encode; printing it raised UnicodeEncodeError after every check
+    had run. Such characters are shown as backslash escapes instead.
+    """
+    return text.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
 def _print_url(url: str) -> None:

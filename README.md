@@ -74,7 +74,7 @@ Once the package is on PyPI the short forms work too: `pipx install mcp-auth-doc
 Each release tag publishes `ghcr.io/basitalisandhu/mcp-auth-doctor` for linux/amd64 and linux/arm64, tagged with the version and `latest`. The image runs as uid 1000 with `/work` as the working directory:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/basitalisandhu/mcp-auth-doctor:0.3.0 https://host/mcp --json
+docker run --rm -v "$PWD:/work" ghcr.io/basitalisandhu/mcp-auth-doctor:0.4.0 https://host/mcp --json
 ```
 
 Inside a container, `127.0.0.1` is the container itself. To check a server on your machine, use the server's network address, or on Linux add `--network host`. The `--login` flow needs a browser and a loopback callback, so run it from a local install instead.
@@ -82,10 +82,10 @@ Inside a container, `127.0.0.1` is the container itself. To check a server on yo
 The image is signed with a keyless cosign signature and has a build provenance attestation and an SPDX SBOM (attached to the GitHub Release). To verify:
 
 ```bash
-cosign verify ghcr.io/basitalisandhu/mcp-auth-doctor:0.3.0 \
+cosign verify ghcr.io/basitalisandhu/mcp-auth-doctor:0.4.0 \
   --certificate-identity-regexp '^https://github.com/basitalisandhu/mcp-auth-doctor/\.github/workflows/publish-github-packages\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-gh attestation verify oci://ghcr.io/basitalisandhu/mcp-auth-doctor:0.3.0 --repo basitalisandhu/mcp-auth-doctor
+gh attestation verify oci://ghcr.io/basitalisandhu/mcp-auth-doctor:0.4.0 --repo basitalisandhu/mcp-auth-doctor
 ```
 
 ### pip
@@ -99,13 +99,16 @@ pip install mcp-auth-doctor
 ## Usage
 
 ```text
-mcp-auth-doctor <mcp-url> [--format text|json|markdown] [--json] [--spec 2026-07-28|2025-11-25] [--dcr-probe] [--login]
+mcp-auth-doctor <mcp-url> [-H 'Name: value']... [--format text|json|markdown] [--json]
+                [--spec 2026-07-28|2025-11-25] [--dcr-probe] [--login]
                 [--client-id ID] [--callback-port N] [--login-timeout S] [--no-browser]
-                [--timeout S] [-v]
+                [--record FILE] [--timeout S] [-v]
+mcp-auth-doctor --replay FILE [--format ...] [--spec ...] [--dcr-probe] [-v]
 ```
 
 | Option | Effect |
 |---|---|
+| `-H`, `--header` | Extra header for MCP requests only, `'Name: value'`, repeatable. Never sent to OAuth endpoints; `Authorization` is refused. |
 | `--format text\|json\|markdown` | Select the output format: `text` (default), `json` (structured JSON document), or `markdown` (Markdown table). |
 | `--json` | Alias for `--format json`: print `{url, checks:[{id,status,reason,evidence}], summary}` instead of the table. |
 | `--spec` | Which specification's rules to apply where they differ (default `2026-07-28`, see below). |
@@ -113,12 +116,25 @@ mcp-auth-doctor <mcp-url> [--format text|json|markdown] [--json] [--spec 2026-07
 | `--login` | Opt in: run the authorization code flow with PKCE and a loopback callback, redeem the code with the `resource` parameter (RFC 8707), validate `iss`, then call `tools/list` with the token. Registers a client unless `--client-id` is given. |
 | `--client-id` | Pre-registered client id for `--login` (its registered redirect URI must be `http://127.0.0.1:<port>/callback`; pin the port with `--callback-port`). |
 | `--no-browser` | With `--login`, print the authorization URL instead of opening a browser. |
+| `--record FILE` | Save every HTTP exchange of the run to `FILE` (see [Recording and replaying a run](#recording-and-replaying-a-run)). Not with `--login`. |
+| `--replay FILE` | Run the checks against a file saved with `--record` instead of the network; the URL comes from the file. Not with `--login`. |
 | `--timeout` | HTTP timeout per request in seconds (default 10). |
 | `-v` | Show evidence for every check, not only failures and warnings. |
 
 Plain `http://` is refused unless the host is `localhost`, `127.0.0.1` or `::1`.
 
-Exit codes: `0` every check passed (warnings and skips allowed), `1` at least one check failed, `2` inconclusive (the server neither returned 401 nor served any metadata, or could not be reached), `3` usage error.
+Exit codes: `0` every check passed (warnings and skips allowed), `1` at least one check failed, `2` inconclusive (the server neither returned 401 nor served any metadata, or could not be reached), `3` usage error (including a URL that cannot be parsed and a replay file that cannot be read).
+
+### Recording and replaying a run
+
+`--record run.json` saves what the tool sent and what came back: method, URL, status, the `content-type`, `location` and `www-authenticate` response headers, and the response body. Request headers are not saved, so values passed with `-H` stay out of the file, and JSON members named `client_secret`, `access_token`, `refresh_token`, `id_token` or `registration_access_token` are replaced with `"[redacted]"`. `--login` is refused with `--record` and `--replay`, so no real token is ever written.
+
+`--replay run.json` runs the same checks against the file with no network access and prints the same report. Attach the file to an issue when a server fails in a way that is hard to describe, or keep it as a test fixture. A request the file does not hold fails as if the server were unreachable (`not in the replay file: GET https://...`).
+
+```sh
+mcp-auth-doctor https://your-server.example.com/mcp --dcr-probe --record run.json
+mcp-auth-doctor --replay run.json --dcr-probe -v
+```
 
 ## Checks
 
@@ -317,6 +333,26 @@ Both versions share the discovery order, PKCE and `resource` rules. The switch m
 
 The `MCP-Protocol-Version` header and `protocolVersion` in the `initialize` request follow the chosen version.
 
+## Troubleshooting
+
+Real messages from the tool and what to do about them.
+
+**`mcp-auth-doctor: command not found` after `pipx install`.** pipx puts commands in `~/.local/bin`, which is not always on `PATH`. Run `pipx ensurepath` and open a new shell, or run it once with `uvx --from git+https://github.com/basitalisandhu/mcp-auth-doctor mcp-auth-doctor <url>`.
+
+**`error: refusing plain http:// for a non-local host; OAuth requires https`.** Plain HTTP is accepted only for `localhost`, `127.0.0.1` and `::1`. Use the server's `https://` URL; for a development server on another machine, reach it through a tunnel on a loopback port.
+
+**`unauth-401  FAIL  could not reach the MCP URL: ConnectError: [Errno 61] Connection refused`, verdict `INCONCLUSIVE (exit 2)`.** Nothing is listening at that host and port. Check the server is running and the port in the URL; inside a container, `127.0.0.1` is the container itself (see [Container image](#container-image)). `[Errno 8] nodename nor servname provided` (macOS) or `Name or service not known` (Linux) means the host name does not resolve.
+
+**`error: URL cannot be parsed: Port out of range 0-65535` or `Invalid IPv6 URL`.** The URL itself is malformed: a port above 65535, or an IPv6 address without its closing `]` (`https://[::1]:8443/mcp`). Earlier versions crashed with a traceback here.
+
+**`error: argument -H/--header: Authorization is not allowed in --header`.** The first request is deliberately unauthenticated, because that is what a client does. Use `--login` to test with a real token.
+
+**`login-token  FAIL  cannot listen for the authorization callback on 127.0.0.1 port 8799: ... Address already in use`.** Another program has the callback port. Leave `--callback-port` out to use a random free port, or pick another; with `--client-id`, the port must match the redirect URI you registered.
+
+**`as-metadata  FAIL  no metadata at any of the N well-known locations`.** Run with `-v`: the evidence lists every URL tried with its status. A 404 on all of them usually means the issuer in `authorization_servers` has a path the authorization server does not use in its well-known URL, or a trailing slash it does not expect.
+
+**`error: run.json: not an exchanges file`** or **`exchanges[3] needs method, url, status (100-599), headers (strings) and body (string)`.** `--replay` reads only files written by `--record`; the message names the first entry that is wrong if the file was edited by hand.
+
 ## Frequently asked questions
 
 **Why does my MCP client say it cannot discover the OAuth configuration?**
@@ -333,9 +369,7 @@ By default the tool only reads: one unauthenticated `initialize`, metadata `GET`
 
 ## Roadmap
 
-- Checks for `bearer_methods_supported` and HTTPS on every endpoint (see [docs/good-first-issues.md](docs/good-first-issues.md)).
-- Extra request headers for servers behind access proxies.
-- Recording real server exchanges as fixtures so a reported failure can be replayed in the test suite.
+- A check for `bearer_methods_supported` (see [docs/good-first-issues.md](docs/good-first-issues.md)).
 - A `--client-metadata-url` mode for `--login` on servers that support Client ID Metadata Documents, once a hosted document is available.
 
 ## Contributing

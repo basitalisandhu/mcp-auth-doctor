@@ -1,4 +1,4 @@
-.PHONY: install lint format test check build demo clean
+.PHONY: install lint format test check e2e build demo clean
 
 PY ?= uv run
 
@@ -17,6 +17,9 @@ test:
 	$(PY) pytest -q
 
 check: lint test
+
+e2e:
+	scripts/e2e_quickstart.sh
 
 build:
 	rm -rf dist

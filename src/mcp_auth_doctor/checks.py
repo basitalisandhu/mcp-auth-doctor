@@ -47,6 +47,11 @@ from .discovery import (
 )
 from .mcpclient import initialize_request, mcp_headers
 
+# A metadata document can name a URL httpx refuses to build a request for (an invalid
+# port, an unclosed IPv6 bracket). httpx raises InvalidURL for that, which is neither an
+# HTTPError nor a ValueError, so every request site catches all three.
+NETWORK_ERRORS: tuple[type[Exception], ...] = (httpx.HTTPError, httpx.InvalidURL, ValueError)
+
 SPECS = ("2026-07-28", "2025-11-25")
 DEFAULT_SPEC = "2026-07-28"
 
@@ -235,7 +240,7 @@ class _Diagnosis:
                 json=initialize_request(self.options.spec),
                 headers=mcp_headers(self.options.spec, extra_headers=self.options.headers),
             )
-        except (httpx.HTTPError, ValueError) as exc:
+        except NETWORK_ERRORS as exc:
             self.add("unauth-401", FAIL, f"could not reach the MCP URL: {describe(exc)}")
             return _UNREACHABLE
 
@@ -466,7 +471,13 @@ class _Diagnosis:
 
     def step_as_metadata(self, issuer: str) -> dict[str, Any] | None:
         attempts: list[dict[str, Any]] = []
-        for candidate in as_metadata_urls(issuer):
+        try:
+            candidates = as_metadata_urls(issuer)
+        except ValueError as exc:
+            # An unclosed IPv6 bracket or a bad port in the issuer URL.
+            candidates = []
+            attempts.append({"url": issuer, "error": describe(exc)})
+        for candidate in candidates:
             document, attempt = self.fetch_json(candidate)
             attempts.append(attempt)
             if document is not None:
@@ -487,7 +498,7 @@ class _Diagnosis:
         self.add(
             "as-metadata",
             FAIL,
-            f"no metadata at any of the {len(attempts)} well-known locations for {issuer}; "
+            f"no metadata at any of the {len(candidates)} well-known locations for {issuer}; "
             "serve RFC 8414 or OpenID Connect Discovery metadata",
             issuer=issuer,
             attempts=attempts,
@@ -711,7 +722,7 @@ class _Diagnosis:
             response = self.client.post(
                 registration, json=body, headers={"Accept": "application/json"}
             )
-        except (httpx.HTTPError, ValueError) as exc:
+        except NETWORK_ERRORS as exc:
             self.add(
                 "dcr-probe",
                 FAIL,
@@ -796,7 +807,7 @@ class _Diagnosis:
             response = self.client.post(
                 token_endpoint, data=form, headers={"Accept": "application/json"}
             )
-        except (httpx.HTTPError, ValueError) as exc:
+        except NETWORK_ERRORS as exc:
             self.add(
                 "token-error-json",
                 FAIL,
@@ -887,7 +898,7 @@ class _Diagnosis:
             response = self.client.get(
                 url, headers={"Accept": "application/json"}, follow_redirects=True
             )
-        except (httpx.HTTPError, ValueError) as exc:
+        except NETWORK_ERRORS as exc:
             attempt["error"] = describe(exc)
             return None, attempt
         attempt["status"] = response.status_code

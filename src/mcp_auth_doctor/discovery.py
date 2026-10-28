@@ -29,7 +29,13 @@ def validate_mcp_url(url: str) -> str:
     Only https is accepted, except for http on localhost, 127.0.0.1 or ::1, which is
     what the OAuth 2.1 and MCP specifications allow for loopback development servers.
     """
-    parts = urlsplit(url)
+    try:
+        parts = urlsplit(url)
+        parts.port  # noqa: B018 - raises ValueError for a port that is not 0-65535
+    except ValueError as exc:
+        raise UrlError(f"URL cannot be parsed: {exc} (got {url!r})") from None
+    if any(ord(c) < 33 or ord(c) == 127 for c in url):
+        raise UrlError(f"URL contains a space or control character (got {url!r})")
     if parts.scheme not in ("http", "https"):
         raise UrlError(f"URL must start with https:// (got {url!r})")
     if not parts.hostname:
@@ -103,6 +109,9 @@ class Challenge:
 
 _TOKEN68 = r"[A-Za-z0-9._~+/-]+=*"
 _PARAM = re.compile(r'\s*([A-Za-z0-9_.-]+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^\s,]+))\s*')
+_SCHEME = re.compile(r"\s*,?\s*([A-Za-z][A-Za-z0-9._~+/-]*)")
+_NEXT = re.compile(r"\s*([A-Za-z][A-Za-z0-9._~+/-]*)\s*(=?)")
+_ESCAPE = re.compile(r"\\(.)")
 
 
 def parse_www_authenticate(value: str) -> list[Challenge]:
@@ -116,11 +125,13 @@ def parse_www_authenticate(value: str) -> list[Challenge]:
     pos = 0
     text = value.strip()
     while pos < len(text):
-        m = re.match(r"\s*,?\s*([A-Za-z][A-Za-z0-9._~+/-]*)", text[pos:])
+        # Patterns are matched at an offset rather than on a slice, so a long header is
+        # read in linear time (slicing made it quadratic).
+        m = _SCHEME.match(text, pos)
         if not m:
             break
         scheme = m.group(1)
-        pos += m.end()
+        pos = m.end()
         ch = Challenge(scheme=scheme)
         challenges.append(ch)
         # Parameters follow until the next token that is a scheme (a bare word followed
@@ -130,12 +141,12 @@ def parse_www_authenticate(value: str) -> list[Challenge]:
             if pm:
                 name = pm.group(1).lower()
                 raw = pm.group(2) if pm.group(2) is not None else pm.group(3)
-                ch.params[name] = re.sub(r"\\(.)", r"\1", raw)
+                ch.params[name] = _ESCAPE.sub(r"\1", raw)
                 pos = pm.end()
                 if pos < len(text) and text[pos] == ",":
                     pos += 1
                     # Look ahead: a new scheme starts if the next word is not followed by '='.
-                    nxt = re.match(r"\s*([A-Za-z][A-Za-z0-9._~+/-]*)\s*(=?)", text[pos:])
+                    nxt = _NEXT.match(text, pos)
                     if nxt and nxt.group(2) != "=":
                         break
                 continue
@@ -165,12 +176,16 @@ def canonical(url: str) -> str:
     https://x/ and https://x as different resource identifiers that implementations
     should not mix.
     """
-    parts = urlsplit(url)
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        # An unclosed IPv6 bracket or a port out of range: compare the text as given.
+        return url
     scheme = parts.scheme.lower()
     host = (parts.hostname or "").lower()
     if ":" in host:
         host = f"[{host}]"
-    port = parts.port
     netloc = host if port is None or DEFAULT_PORTS.get(scheme) == port else f"{host}:{port}"
     return urlunsplit((scheme, netloc, parts.path, parts.query, ""))
 
@@ -213,12 +228,12 @@ def is_json_content_type(content_type: str | None) -> bool:
     return media == "application/json" or media.endswith("+json")
 
 
-def issuer_matches(expected: str, actual: str | None) -> bool:
+def issuer_matches(expected: str, actual: object) -> bool:
     """RFC 8414 section 3.3: issuer must be identical to the one used to build the URL.
 
     A trailing slash on either side is tolerated, since many servers list the issuer
     with one and the metadata without; anything else is a mismatch.
     """
-    if not actual:
+    if not isinstance(actual, str) or not actual:
         return False
     return expected.rstrip("/") == actual.rstrip("/")

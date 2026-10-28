@@ -42,6 +42,19 @@ jobs:
           if mcp-auth-doctor http://127.0.0.1:8766/mcp --json > broken.json; then echo "expected exit 1"; exit 1; fi
           python -c "import json; d=json.load(open('broken.json')); assert d['summary']['exit_code']==1; assert any(c['id']=='prm-resource' and c['status']=='fail' for c in d['checks'])"
 
+  quickstart:
+    name: README quick start on a fresh install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install into a new venv and run the quick start against the demo server
+        run: scripts/e2e_quickstart.sh
+
   container-build:
     name: Build the container image and run it
     runs-on: ubuntu-latest

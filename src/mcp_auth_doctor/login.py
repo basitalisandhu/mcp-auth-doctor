@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 import httpx
 
 from . import __version__
-from .checks import FAIL, PASS, SKIP, Check, Options, describe
+from .checks import FAIL, NETWORK_ERRORS, PASS, SKIP, Check, Options, describe
 from .discovery import is_json_content_type
 from .mcpclient import initialize_request, mcp_headers, parse_jsonrpc_response, tools_list_request
 
@@ -240,7 +240,7 @@ def run_login(
             token_response = client.post(
                 token_endpoint, data=form, headers={"Accept": "application/json"}
             )
-        except (httpx.HTTPError, ValueError) as exc:
+        except NETWORK_ERRORS as exc:
             checks.append(
                 Check("login-token", FAIL, f"token request failed: {describe(exc)}", evidence)
             )
@@ -320,7 +320,7 @@ def _register(
         response = client.post(
             registration_endpoint, json=body, headers={"Accept": "application/json"}
         )
-    except (httpx.HTTPError, ValueError) as exc:
+    except NETWORK_ERRORS as exc:
         return {"error": describe(exc)}
     try:
         document = response.json()
@@ -370,7 +370,7 @@ def _tools_list(
             json=initialize_request(spec, 1),
             headers=mcp_headers(spec, token, extra_headers=extra_headers),
         )
-    except (httpx.HTTPError, ValueError) as exc:
+    except NETWORK_ERRORS as exc:
         return Check(
             "login-tools-list", FAIL, f"initialize with the token failed: {describe(exc)}", evidence
         )
@@ -397,7 +397,7 @@ def _tools_list(
             url, json={"jsonrpc": "2.0", "method": "notifications/initialized"}, headers=headers
         )
         listed = client.post(url, json=tools_list_request(2), headers=headers)
-    except (httpx.HTTPError, ValueError) as exc:
+    except NETWORK_ERRORS as exc:
         return Check("login-tools-list", FAIL, f"tools/list failed: {describe(exc)}", evidence)
     evidence["tools_list_status"] = listed.status_code
     if listed.status_code >= 400:
