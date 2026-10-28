@@ -117,7 +117,7 @@ mcp-auth-doctor --replay FILE [--format ...] [--spec ...] [--dcr-probe] [-v]
 | `--client-id` | Pre-registered client id for `--login` (its registered redirect URI must be `http://127.0.0.1:<port>/callback`; pin the port with `--callback-port`). |
 | `--no-browser` | With `--login`, print the authorization URL instead of opening a browser. |
 | `--record FILE` | Save every HTTP exchange of the run to `FILE` (see [Recording and replaying a run](#recording-and-replaying-a-run)). Not with `--login`. |
-| `--replay FILE` | Run the checks against a file saved with `--record` instead of the network; the URL comes from the file. Not with `--login`. |
+| `--replay FILE` | Run the checks against a file saved with `--record` instead of the network; `-` reads it from standard input. The URL comes from the file. Not with `--login`. |
 | `--timeout` | HTTP timeout per request in seconds (default 10). |
 | `-v` | Show evidence for every check, not only failures and warnings. |
 
@@ -131,9 +131,12 @@ Exit codes: `0` every check passed (warnings and skips allowed), `1` at least on
 
 `--replay run.json` runs the same checks against the file with no network access and prints the same report. Attach the file to an issue when a server fails in a way that is hard to describe, or keep it as a test fixture. A request the file does not hold fails as if the server were unreachable (`not in the replay file: GET https://...`).
 
+`--replay -` reads the same file from standard input, so a file attached to an issue or fetched with `curl` can be piped straight in without saving it first. The same 50 MB limit and error messages apply, with `<stdin>` in place of the file name.
+
 ```sh
 mcp-auth-doctor https://your-server.example.com/mcp --dcr-probe --record run.json
 mcp-auth-doctor --replay run.json --dcr-probe -v
+mcp-auth-doctor --replay - --dcr-probe -v < run.json
 ```
 
 ## Checks

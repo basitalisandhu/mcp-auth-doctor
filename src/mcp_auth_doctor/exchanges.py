@@ -14,6 +14,7 @@ with either option, so no real access token ever reaches the file.
 from __future__ import annotations
 
 import json
+import sys
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
@@ -136,28 +137,47 @@ class ReplayTransport(httpx.BaseTransport):
 
 
 def load(path: str) -> tuple[str, list[dict[str, Any]]]:
-    """Read a replay file. Returns (MCP URL, exchanges). Raises ExchangeFileError."""
-    file = Path(path)
-    try:
-        if file.stat().st_size > MAX_FILE_BYTES:
-            raise ExchangeFileError(f"{path}: larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
-        text = file.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise ExchangeFileError(f"{path}: {exc.strerror or exc}") from None
-    except UnicodeDecodeError:
-        raise ExchangeFileError(f"{path}: not UTF-8 text") from None
+    """Read a replay file. A path of "-" reads standard input instead.
+
+    Returns (MCP URL, exchanges). Raises ExchangeFileError. Error messages
+    name "<stdin>" for standard input and the file path otherwise.
+    """
+    display = "<stdin>" if path == "-" else path
+    if path == "-":
+        try:
+            data = sys.stdin.buffer.read(MAX_FILE_BYTES + 1)
+        except OSError as exc:
+            raise ExchangeFileError(f"{display}: {exc.strerror or exc}") from None
+        if len(data) > MAX_FILE_BYTES:
+            raise ExchangeFileError(f"{display}: larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            raise ExchangeFileError(f"{display}: not UTF-8 text") from None
+    else:
+        file = Path(path)
+        try:
+            if file.stat().st_size > MAX_FILE_BYTES:
+                raise ExchangeFileError(
+                    f"{display}: larger than {MAX_FILE_BYTES // (1024 * 1024)} MB"
+                )
+            text = file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ExchangeFileError(f"{display}: {exc.strerror or exc}") from None
+        except UnicodeDecodeError:
+            raise ExchangeFileError(f"{display}: not UTF-8 text") from None
     try:
         document = json.loads(text)
     except RecursionError:
-        raise ExchangeFileError(f"{path}: JSON nested too deeply") from None
+        raise ExchangeFileError(f"{display}: JSON nested too deeply") from None
     except ValueError as exc:
-        raise ExchangeFileError(f"{path}: not JSON ({exc})") from None
+        raise ExchangeFileError(f"{display}: not JSON ({exc})") from None
     if not isinstance(document, dict) or document.get("format") != FORMAT:
-        raise ExchangeFileError(f"{path}: not an exchanges file (expected format {FORMAT!r})")
+        raise ExchangeFileError(f"{display}: not an exchanges file (expected format {FORMAT!r})")
     url = document.get("url")
     exchanges = document.get("exchanges")
     if not isinstance(url, str) or not isinstance(exchanges, list):
-        raise ExchangeFileError(f"{path}: needs a string `url` and an `exchanges` list")
+        raise ExchangeFileError(f"{display}: needs a string `url` and an `exchanges` list")
     for index, exchange in enumerate(exchanges):
         if not (
             isinstance(exchange, dict)
@@ -174,7 +194,7 @@ def load(path: str) -> tuple[str, list[dict[str, Any]]]:
             and isinstance(exchange.get("body"), str)
         ):
             raise ExchangeFileError(
-                f"{path}: exchanges[{index}] needs method, url, status (100-599), "
+                f"{display}: exchanges[{index}] needs method, url, status (100-599), "
                 "headers (strings) and body (string)"
             )
     return url, exchanges

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `--replay -` reads the exchanges file from standard input, so a run can be piped straight from `curl` or an issue attachment without saving it first; the same 50 MB limit and error messages apply, with `<stdin>` in place of the file name.
+
 ## [0.4.0] - 2026-10-28
 
 ### Added

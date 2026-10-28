@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
 import json
 import random
+import sys
 
 import httpx
 import pytest
@@ -158,6 +160,29 @@ def test_bad_replay_files_name_the_file(tmp_path, content, message, capsys) -> N
 def test_missing_replay_file(tmp_path, capsys) -> None:
     assert main(["--replay", str(tmp_path / "nope.json")]) == 3
     assert "nope.json" in capsys.readouterr().err
+
+
+def test_replay_from_stdin_matches_the_file(tmp_path, monkeypatch, capsys) -> None:
+    recorder, _ = _record()
+    path = tmp_path / "run.json"
+    recorder.write(str(path), MCP)
+    assert main(["--replay", str(path), "--json"]) == 1
+    from_file = json.loads(capsys.readouterr().out)
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(path.read_bytes())))
+    assert main(["--replay", "-", "--json"]) == 1
+    from_stdin = json.loads(capsys.readouterr().out)
+    assert from_stdin["url"] == from_file["url"]
+    assert [(c["id"], c["status"]) for c in from_stdin["checks"]] == [
+        (c["id"], c["status"]) for c in from_file["checks"]
+    ]
+
+
+def test_stdin_replay_errors_name_stdin(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b"not json")))
+    assert main(["--replay", "-"]) == 3
+    err = capsys.readouterr().err
+    assert "<stdin>" in err
+    assert "not JSON" in err
 
 
 def test_fuzzed_replay_files_never_raise_anything_else(tmp_path) -> None:

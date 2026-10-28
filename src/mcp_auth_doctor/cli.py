@@ -133,7 +133,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--replay",
         metavar="FILE",
-        help="run the checks against exchanges saved with --record instead of the network",
+        help=(
+            "run the checks against exchanges saved with --record instead of the "
+            "network; '-' reads standard input"
+        ),
     )
     parser.add_argument(
         "--timeout", type=float, default=10.0, help="HTTP timeout in seconds (default 10)"
