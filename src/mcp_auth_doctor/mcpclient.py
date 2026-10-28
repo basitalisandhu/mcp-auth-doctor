@@ -74,14 +74,14 @@ def parse_jsonrpc_response(response: httpx.Response, request_id: int) -> dict[st
         for data in _sse_data_blocks(response.text):
             try:
                 message = json.loads(data)
-            except ValueError:
+            except (ValueError, RecursionError):
                 continue
             if isinstance(message, dict) and message.get("id") == request_id:
                 return message
         return None
     try:
         message = response.json()
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
     if isinstance(message, dict):
         return message

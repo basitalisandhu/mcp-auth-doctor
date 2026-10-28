@@ -21,6 +21,7 @@ All notable changes to this project are documented here. The format follows
 
 - Metadata naming a URL httpx cannot build a request for (an unclosed IPv6 bracket, a port above 65535) crashed the run with a traceback; it is now a failed check with the reason.
 - An `issuer` that is an object or a list crashed the issuer comparison; it now fails `as-issuer`.
+- On Python 3.11 a metadata, registration or token body nested tens of thousands of levels deep raised `RecursionError` out of the JSON decoder and crashed the run; it is now treated as a body that is not JSON. `--record` omits such a body instead of writing it unredacted.
 - A JSON body with an escaped lone surrogate (`"\udcff"`) crashed printing the report; such characters are printed as escapes.
 - A malformed MCP URL on the command line (`https://[::1/mcp`, port out of range) crashed or ran as unreachable; it is now a usage error (exit 3) naming the problem.
 

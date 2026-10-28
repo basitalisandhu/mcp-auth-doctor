@@ -241,3 +241,19 @@ def test_lone_surrogate_in_a_report_still_prints() -> None:
 def test_unparseable_url_is_a_usage_error(url: str, capsys: pytest.CaptureFixture[str]) -> None:
     assert main([url]) == 3
     assert "error:" in capsys.readouterr().err
+
+
+def test_deeply_nested_metadata_is_not_json_on_every_python() -> None:
+    # Python 3.11's decoder raised RecursionError (not a ValueError) for this body.
+    deep = b'{"a":' * 100_000 + b"1" + b"}" * 100_000
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            return httpx.Response(
+                401, headers={"www-authenticate": f'Bearer resource_metadata="{PRM}"'}
+            )
+        return httpx.Response(200, headers={"content-type": "application/json"}, content=deep)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        report = _within_limit(diagnose, MCP, Options(dcr_probe=True), client)
+    assert {c.id: c.status for c in report.checks}["prm-fetch"] == "fail"

@@ -54,10 +54,17 @@ def _body_text(response: httpx.Response) -> str:
     text = response.content.decode("utf-8", "backslashreplace")
     try:
         document = json.loads(text)
+    except RecursionError:
+        # Too deep to walk for secrets, so it is not written; the checks treat it as
+        # "not JSON" either way.
+        return "[body omitted: JSON nested too deeply to redact]"
     except ValueError:
         return text
     if isinstance(document, (dict, list)):
-        redacted = _redact(document)
+        try:
+            redacted = _redact(document)
+        except RecursionError:
+            return "[body omitted: JSON nested too deeply to redact]"
         if redacted != document:
             return json.dumps(redacted)
     return text

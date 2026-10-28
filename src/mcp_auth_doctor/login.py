@@ -253,7 +253,7 @@ def run_login(
         if is_json_content_type(content_type):
             try:
                 token = token_response.json()
-            except ValueError:
+            except (ValueError, RecursionError):
                 token = None
         if (
             token_response.status_code != 200
@@ -324,7 +324,7 @@ def _register(
         return {"error": describe(exc)}
     try:
         document = response.json()
-    except ValueError:
+    except (ValueError, RecursionError):
         return {"error": f"{response.status_code} with a non-JSON body"}
     if (
         response.status_code not in (200, 201)

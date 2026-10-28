@@ -737,7 +737,7 @@ class _Diagnosis:
         if is_json:
             try:
                 document = response.json()
-            except ValueError:
+            except (ValueError, RecursionError):
                 is_json = False
         evidence = {
             "issuer": issuer,
@@ -854,7 +854,7 @@ class _Diagnosis:
             return
         try:
             document = response.json()
-        except ValueError:
+        except (ValueError, RecursionError):
             self.add(
                 "token-error-json",
                 FAIL,
@@ -910,7 +910,7 @@ class _Diagnosis:
             return None, attempt
         try:
             document = response.json()
-        except ValueError:
+        except (ValueError, RecursionError):
             attempt["error"] = "body is not JSON"
             return None, attempt
         if not isinstance(document, dict):
