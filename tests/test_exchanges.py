@@ -175,6 +175,9 @@ def test_replay_from_stdin_matches_the_file(tmp_path, monkeypatch, capsys) -> No
     assert [(c["id"], c["status"]) for c in from_stdin["checks"]] == [
         (c["id"], c["status"]) for c in from_file["checks"]
     ]
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(path.read_bytes())))
+    assert main(["--replay", "-"]) == 1
+    assert "(replayed from <stdin>)" in capsys.readouterr().out.splitlines()[0]
 
 
 def test_stdin_replay_errors_name_stdin(monkeypatch, capsys) -> None:
