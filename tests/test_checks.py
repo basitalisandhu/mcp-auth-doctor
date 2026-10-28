@@ -135,18 +135,19 @@ def test_json_document_shape(router):
     assert doc["url"] == MCP
     assert all(set(c) == {"id", "status", "reason", "evidence"} for c in doc["checks"])
     assert doc["summary"]["verdict"] == "pass" and doc["summary"]["exit_code"] == 0
-    assert doc["summary"]["pass"] == 13 and doc["summary"]["skip"] == 5
+    assert doc["summary"]["pass"] == 14 and doc["summary"]["skip"] == 4
     assert doc["summary"]["spec"] == "2026-07-28"
 
 
 @pytest.mark.parametrize(
     "extra, status",
     [
-        ({}, SKIP),
+        ({}, PASS),
         ({"bearer_methods_supported": ["header"]}, PASS),
         ({"bearer_methods_supported": ["header", "query"]}, PASS),
         ({"bearer_methods_supported": ["query"]}, FAIL),
         ({"bearer_methods_supported": ["body"]}, FAIL),
+        ({"bearer_methods_supported": ["body", "query"]}, FAIL),
         ({"bearer_methods_supported": []}, FAIL),
         ({"bearer_methods_supported": "header"}, WARN),
         ({"bearer_methods_supported": ["header", 1]}, WARN),

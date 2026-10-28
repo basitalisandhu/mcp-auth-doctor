@@ -65,7 +65,7 @@ run() { # run <expected exit code> <output file> <args...>
 run 1 table.txt "$url"
 expect table.txt "prm-resource               FAIL  resource differs from the MCP URL only by a trailing slash (resource has the slash)"
 expect table.txt 'as-pkce                    FAIL  `code_challenge_methods_supported` is absent'
-expect table.txt "10 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)"
+expect table.txt "11 pass, 3 fail, 1 warn, 3 skip. Verdict: FAIL (exit 1)"
 
 # -v adds evidence for every check.
 run 1 verbose.txt "$url" -v

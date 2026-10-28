@@ -426,12 +426,13 @@ class _Diagnosis:
                 scopes_supported=prm.get("scopes_supported"),
             )
 
-        # RFC 9728 section 2 says omission implies no supported-method default.
+        # RFC 9728 section 2 says omission implies no supported-method default,
+        # and most servers omit the member, so absence is a pass, not a skip.
         if "bearer_methods_supported" not in prm:
             self.add(
                 "prm-bearer-methods",
-                SKIP,
-                "`bearer_methods_supported` is absent; RFC 9728 implies no default methods",
+                PASS,
+                "`bearer_methods_supported` is absent; MCP clients use Authorization",
             )
         else:
             methods = prm["bearer_methods_supported"]
