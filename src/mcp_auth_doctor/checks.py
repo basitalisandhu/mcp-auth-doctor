@@ -36,7 +36,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from . import __version__
+from . import __version__, _jsondepth
 from .discovery import (
     as_metadata_urls,
     bearer_scope,
@@ -772,7 +772,7 @@ class _Diagnosis:
         document: Any = None
         if is_json:
             try:
-                document = response.json()
+                document = _jsondepth.loads(response.content)
             except (ValueError, RecursionError):
                 is_json = False
         evidence = {
@@ -889,7 +889,7 @@ class _Diagnosis:
             )
             return
         try:
-            document = response.json()
+            document = _jsondepth.loads(response.content)
         except (ValueError, RecursionError):
             self.add(
                 "token-error-json",
@@ -945,7 +945,7 @@ class _Diagnosis:
         if response.status_code != 200:
             return None, attempt
         try:
-            document = response.json()
+            document = _jsondepth.loads(response.content)
         except (ValueError, RecursionError):
             attempt["error"] = "body is not JSON"
             return None, attempt

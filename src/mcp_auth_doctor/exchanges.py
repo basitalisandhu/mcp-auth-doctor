@@ -21,7 +21,7 @@ from typing import Any
 
 import httpx
 
-from . import __version__
+from . import __version__, _jsondepth
 
 FORMAT = "mcp-auth-doctor-exchanges/1"
 KEPT_HEADERS = ("content-type", "location", "www-authenticate")
@@ -54,7 +54,7 @@ def _redact(value: Any) -> Any:
 def _body_text(response: httpx.Response) -> str:
     text = response.content.decode("utf-8", "backslashreplace")
     try:
-        document = json.loads(text)
+        document = _jsondepth.loads(text)
     except RecursionError:
         # Too deep to walk for secrets, so it is not written; the checks treat it as
         # "not JSON" either way.
@@ -167,7 +167,7 @@ def load(path: str) -> tuple[str, list[dict[str, Any]]]:
         except UnicodeDecodeError:
             raise ExchangeFileError(f"{display}: not UTF-8 text") from None
     try:
-        document = json.loads(text)
+        document = _jsondepth.loads(text)
     except RecursionError:
         raise ExchangeFileError(f"{display}: JSON nested too deeply") from None
     except ValueError as exc:

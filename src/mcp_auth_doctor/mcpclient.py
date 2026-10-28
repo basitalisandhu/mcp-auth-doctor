@@ -7,13 +7,12 @@ be plain JSON or a text/event-stream body; both are handled.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from typing import Any
 
 import httpx
 
-from . import __version__
+from . import __version__, _jsondepth
 
 MCP_PROTOCOL_VERSIONS = {"2026-07-28": "2026-07-28", "2025-11-25": "2025-11-25"}
 
@@ -73,14 +72,14 @@ def parse_jsonrpc_response(response: httpx.Response, request_id: int) -> dict[st
     if content_type == "text/event-stream":
         for data in _sse_data_blocks(response.text):
             try:
-                message = json.loads(data)
+                message = _jsondepth.loads(data)
             except (ValueError, RecursionError):
                 continue
             if isinstance(message, dict) and message.get("id") == request_id:
                 return message
         return None
     try:
-        message = response.json()
+        message = _jsondepth.loads(response.content)
     except (ValueError, RecursionError):
         return None
     if isinstance(message, dict):

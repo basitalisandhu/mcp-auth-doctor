@@ -6,10 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-29
+
 ### Added
 
 - `prm-bearer-methods` checks protected-resource metadata: a `bearer_methods_supported` array omitting `header` fails, a malformed value warns, and an absent member passes (MCP clients send the token in the Authorization header).
 - `--replay -` reads the exchanges file from standard input, so a run can be piped straight from `curl` or an issue attachment without saving it first; the same 50 MB limit and error messages apply, with `<stdin>` in place of the file name.
+
+### Fixed
+
+- Deeply nested JSON (server metadata, token responses, MCP messages, replay files) is treated the same way on every supported Python: not JSON for the checks, a clear "nested too deeply" error for `--replay`. Python 3.14 no longer raises `RecursionError` from `json.loads` at the old depth, so JSON is now checked for nesting first (limit 200 levels) instead of relying on it.
+- CI tests Python 3.11 to 3.14.
 
 ## [0.4.0] - 2026-10-28
 
@@ -75,7 +82,8 @@ All notable changes to this project are documented here. The format follows
 
 - Renamed the umbrella project from Hisar to Masoon; links, names and identifiers updated.
 
-[Unreleased]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.4.0...v0.5.0
 [0.3.0]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/basitalisandhu/mcp-auth-doctor/compare/v0.1.0...v0.1.1

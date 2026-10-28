@@ -20,7 +20,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx
 
-from . import __version__
+from . import __version__, _jsondepth
 from .checks import FAIL, NETWORK_ERRORS, PASS, SKIP, Check, Options, describe
 from .discovery import is_json_content_type
 from .mcpclient import initialize_request, mcp_headers, parse_jsonrpc_response, tools_list_request
@@ -252,7 +252,7 @@ def run_login(
         token: dict[str, Any] | None = None
         if is_json_content_type(content_type):
             try:
-                token = token_response.json()
+                token = _jsondepth.loads(token_response.content)
             except (ValueError, RecursionError):
                 token = None
         if (
@@ -323,7 +323,7 @@ def _register(
     except NETWORK_ERRORS as exc:
         return {"error": describe(exc)}
     try:
-        document = response.json()
+        document = _jsondepth.loads(response.content)
     except (ValueError, RecursionError):
         return {"error": f"{response.status_code} with a non-JSON body"}
     if (
