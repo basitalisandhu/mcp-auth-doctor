@@ -180,6 +180,19 @@ def test_replay_from_stdin_matches_the_file(tmp_path, monkeypatch, capsys) -> No
     assert "(replayed from <stdin>)" in capsys.readouterr().out.splitlines()[0]
 
 
+def test_stdin_replay_refuses_interactive_terminal(monkeypatch, capsys) -> None:
+    class DummyTTY(io.TextIOWrapper):
+        def isatty(self) -> bool:
+            return True
+
+    monkeypatch.setattr(sys, "stdin", DummyTTY(io.BytesIO(b"")))
+    with pytest.raises(ExchangeFileError, match="stdin is an interactive terminal"):
+        load("-")
+    assert main(["--replay", "-"]) == 3
+    err = capsys.readouterr().err
+    assert "interactive terminal" in err
+
+
 def test_stdin_replay_errors_name_stdin(monkeypatch, capsys) -> None:
     monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b"not json")))
     assert main(["--replay", "-"]) == 3

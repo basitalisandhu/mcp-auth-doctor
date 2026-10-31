@@ -144,6 +144,10 @@ def load(path: str) -> tuple[str, list[dict[str, Any]]]:
     """
     display = "<stdin>" if path == "-" else path
     if path == "-":
+        if hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
+            raise ExchangeFileError(
+                f"{display}: stdin is an interactive terminal; pipe a replay file or pass a path"
+            )
         try:
             data = sys.stdin.buffer.read(MAX_FILE_BYTES + 1)
         except OSError as exc:
