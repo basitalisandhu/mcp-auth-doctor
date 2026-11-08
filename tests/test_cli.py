@@ -157,6 +157,26 @@ def _unescaped_pipes(row):
     return len(re.findall(r"(?<!\\)\|", row))
 
 
+def test_record_to_unwritable_path_fails_before_diagnosis(router, capsys):
+    mount(router)
+    assert main([MCP, "--record", "no-such-dir/report.json"]) == 3
+    captured = capsys.readouterr()
+    assert "cannot write no-such-dir/report.json" in captured.err
+    assert "Verdict" not in captured.out
+    assert router.calls == []
+
+
+def test_record_to_writable_path_saves_and_prints_report(router, tmp_path, capsys):
+    mount(router)
+    record = tmp_path / "exchanges.json"
+    assert main([MCP, "--record", str(record)]) == 0
+    out = capsys.readouterr().out
+    assert "Verdict: PASS (exit 0)" in out
+    doc = json.loads(record.read_text(encoding="utf-8"))
+    assert doc["url"] == MCP
+    assert doc["exchanges"]
+
+
 @pytest.mark.parametrize(
     "reason, evidence, escaped",
     [

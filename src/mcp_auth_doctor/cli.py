@@ -179,6 +179,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_USAGE
     if args.callback_port < 0 or args.callback_port > 65535:
         parser.error("--callback-port must be between 0 and 65535")
+    if args.record:
+        # Fail fast on an unwritable record path instead of running the whole
+        # diagnosis first and then throwing the report away. Opening in append
+        # mode proves the path is writable without changing its contents.
+        try:
+            with open(args.record, "a", encoding="utf-8"):
+                pass
+        except OSError as exc:
+            print(
+                f"{parser.prog}: error: cannot write {args.record}: {exc.strerror}", file=sys.stderr
+            )
+            return EXIT_USAGE
 
     options = Options(
         spec=args.spec,
